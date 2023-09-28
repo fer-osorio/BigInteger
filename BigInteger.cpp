@@ -13,7 +13,7 @@ BigInteger::BigInteger(i64 number) {
     last = digits;
 }
 
-BigInteger::BigInteger(ui64 array[], unsigned size, bool positive)
+BigInteger::BigInteger(const ui64 array[], unsigned size, bool positive)
     : Positive(positive) {
     if(array == NULL || size == 0) {
         digits = new Digit(0);
@@ -33,8 +33,41 @@ BigInteger::BigInteger(const char str[]) {
 
 }
 
-BigInteger::BigInteger(const char bytes[], bool positive) {
+BigInteger::BigInteger(const char bytes[], ui64 size, bool positive)
+    : Positive(positive) {
+    if(bytes == NULL || size == 0) {
+        digits = new Digit(0);
+        last = digits;
+        return;
+    }
+    ui64 q = size >> 3; // q = size / 8;
+    ui64 r = size &  7; // r = size % 8;
+    ui64 buffer = 0;
+    ui64 i = 0;
 
+    if(q == 0) {
+        while(i < r) {
+            buffer <<= 8;
+            buffer |= (ui64)(ui08)bytes[i++];
+        }
+        digits = new Digit(buffer);
+        last = digits;
+        return;
+    }
+    if(r > 0) {
+        while(i < r) {
+            buffer <<= 8;
+            buffer |= (ui64)(ui08)bytes[i++];
+        }
+        digits = new Digit(buffer);
+        last = digits;
+        i += r;
+    } else {
+        digits = new Digit(_8bytes_to_int64(bytes));
+        last = digits;
+        i += 8;
+    }
+    for(; i < q; i += 8) push(_8bytes_to_int64(&bytes[i]));
 }
 
 BigInteger::~BigInteger() {
@@ -51,12 +84,18 @@ void BigInteger::append(ui64 x) {
     last = last->next;
 }
 
+void BigInteger::push(ui64 x) {
+    Digit* _digits = new Digit(x);
+    _digits->next = digits;
+    digits = _digits;
+}
+
 ui64 BigInteger::_8bytes_to_int64(const char bytes[8]) {
     ui64 r = 0; // -64 zero bits
     for(int i = 0; i < 8; i++) {
         r <<= 8; // Making room for the bits of the next byte
         // Allocating bits at the right end.
-        r |= ui64((unsigned char)bytes[i]);
+        r |= (ui64)(ui08)bytes[i];
     }
     return r;
 }
