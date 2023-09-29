@@ -16,8 +16,7 @@ BigInteger::BigInteger(i64 number) {
 BigInteger::BigInteger(const ui64 array[], unsigned size, bool positive)
     : Positive(positive) {
     if(array == NULL || size == 0) {
-        digits = new Digit(0);
-        last = digits;
+        setAsZero();
         return;
     }
     unsigned i = 1;
@@ -29,15 +28,51 @@ BigInteger::BigInteger(const ui64 array[], unsigned size, bool positive)
     }
 }
 
-BigInteger::BigInteger(const char str[]) {
+BigInteger::BigInteger(const char str[], NumberBase base) {
+    int strlen = -1, validCharCount = 0, i = 0, value = -1;
+    while(str[++strlen] != 0) {}
+    if(strlen == 0 || str == NULL) {
+        setAsZero();
+        return;
+    }
+    if(str[0] == '-') { // -Determining the sign.
+        Positive = false; i++;
+    }
+    while(i < strlen) { // Valid character for any of the number bases.
+        switch(base) {
+            case BINARY :
+                if(str[i] == '0' || str[i] == '1') {
 
+                }
+                break;
+            case QUATERNARY :
+                if(str[i] > 47 && str[i] < 52 ) {
+
+                }
+                break;
+            case OCTAL :
+                if(str[i] > 47 && str[i] < 56 ) {
+
+                }
+                break;
+            case HEXADECIMAL :
+                if(str[i] > 47 && str[i] < 57 ) value = str[i] - 48;
+                if(str[i] > 64 && str[i] < 91 ) value = str[i] - 55;
+                if(str[i] > 96 && str[i] < 123) value = str[i] - 87;
+                break;
+            case DECIMAL :
+                if(str[i] > 47 && str[i] < 57 ) value = str[i] - 48;
+                break;
+            default: ;
+        }
+        i++;
+    }
 }
 
 BigInteger::BigInteger(const char bytes[], ui64 size, bool positive)
     : Positive(positive) {
     if(bytes == NULL || size == 0) {
-        digits = new Digit(0);
-        last = digits;
+        setAsZero();
         return;
     }
     ui64 q = size >> 3; // q = size / 8;
@@ -77,6 +112,11 @@ BigInteger::~BigInteger() {
         digits = digits->next;
         delete aux;
     }
+}
+
+void BigInteger::setAsZero() {
+    digits = new Digit(0);
+    last = digits;
 }
 
 void BigInteger::append(ui64 x) {
