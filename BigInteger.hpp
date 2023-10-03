@@ -41,7 +41,10 @@ struct BigInteger {
 	friend BigInteger operator + (BigInteger);
 	friend BigInteger operator - (BigInteger);
 	friend BigInteger operator * (BigInteger);
-	std::ostream& operator  <<  (std::ostream&);
+	friend std::ostream& operator << (std::ostream&, BigInteger);
+
+	void print();
+	void println();
 
 	private:
 	void setAsZero();
@@ -50,6 +53,7 @@ struct BigInteger {
 	ui64  pop(void);
 	ui64 _8bytes_to_int64(const char[8]);
 	void int64_to_8bytes(const ui64, char[8]);
+	bool isValidDigit(char, NumberBase);
 };
 
 #endif

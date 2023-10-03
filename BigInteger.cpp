@@ -29,43 +29,79 @@ BigInteger::BigInteger(const ui64 array[], unsigned size, bool positive)
 }
 
 BigInteger::BigInteger(const char str[], NumberBase base) {
-    int strlen = -1, validCharCount = 0, i = 0, value = -1;
+    int strlen = -1, validCharCount = 0, bitsOccupied = 0;
+    int lowerLimit = 0; // -O if no negative sign, 1 in other case
+    int value = 0;      // -Holds number value of ascii character.
+    if(base > 4) base = (NumberBase)3;
     while(str[++strlen] != 0) {}
     if(strlen == 0 || str == NULL) {
         setAsZero();
         return;
     }
     if(str[0] == '-') { // -Determining the sign.
-        Positive = false; i++;
+        Positive = false;
+        lowerLimit = 1;
     }
-    while(i < strlen) { // Valid character for any of the number bases.
-        switch(base) {
-            case BINARY :
-                if(str[i] == '0' || str[i] == '1') {
-
+    switch(base) {
+        case BINARY :
+            while(--strlen >= lowerLimit) {
+                if(str[strlen] == '1' || str[strlen] == '0') {
+                    if(bitsOccupied == 0) append(0);
+                    last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
+                    validCharCount++;
+                    bitsOccupied = validCharCount & 63;
                 }
-                break;
-            case QUATERNARY :
-                if(str[i] > 47 && str[i] < 52 ) {
-
+            }
+            break;
+        case QUATERNARY :
+            while(--strlen >= lowerLimit) {
+                if(str[strlen] > 47 && str[strlen] < 52 ) {
+                    if(bitsOccupied == 0) append(0);
+                    last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
+                    validCharCount++;
+                    bitsOccupied = (validCharCount << 1) & 63;
                 }
-                break;
-            case OCTAL :
-                if(str[i] > 47 && str[i] < 56 ) {
-
+            }
+            break;
+        case OCTAL :
+            while(--strlen >= lowerLimit) {
+                if(str[strlen] > 47 && str[strlen] < 56 ) {
+                    if(bitsOccupied == 0) append(0);
+                    last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
+                    validCharCount++;
+                    bitsOccupied = (validCharCount * 3) & 63;
                 }
-                break;
-            case HEXADECIMAL :
-                if(str[i] > 47 && str[i] < 57 ) value = str[i] - 48;
-                if(str[i] > 64 && str[i] < 91 ) value = str[i] - 55;
-                if(str[i] > 96 && str[i] < 123) value = str[i] - 87;
-                break;
-            case DECIMAL :
-                if(str[i] > 47 && str[i] < 57 ) value = str[i] - 48;
-                break;
-            default: ;
-        }
-        i++;
+            }
+            break;
+        case HEXADECIMAL :
+            bool validHexChar;
+            while(--strlen >= lowerLimit) {
+                if(str[strlen] > 47 && str[strlen] < 57 ) {
+                    value = str[strlen] - 48;
+                    validHexChar = true;
+                }
+                if(str[strlen] > 64 && str[strlen] < 91 ) {
+                    value = str[strlen] - 55;
+                    validHexChar = true;
+                }
+                if(str[strlen] > 96 && str[strlen] < 123) {
+                    value = str[strlen] - 87;
+                    validHexChar = true;
+                }
+                if(validHexChar) {
+                    if(bitsOccupied == 0) append(0);
+                    last->value |= (ui64)value << bitsOccupied;
+                    validCharCount++;
+                    bitsOccupied = (validCharCount << 2) & 63;
+                }
+            }
+            break;
+        case DECIMAL :
+            if(str[strlen] > 47 && str[strlen] < 57 ) {
+                // ...
+            }
+            break;
+        default: ;
     }
 }
 
@@ -114,12 +150,63 @@ BigInteger::~BigInteger() {
     }
 }
 
+std::ostream& operator << (std::ostream& s, BigInteger x) {
+    if(x.digits == NULL) return s << "";
+    char buffer[8];       // -Needed to safe the hexadecimal
+                          //  digits of the number.
+    // -buffer contents gets "unreachable" once out of the
+    //  function, so we need to save the content in other place
+    char b0, b1, b2, b3, b4, b5, b6, b7;
+    BigInteger::Digit* r = x.digits;  // -Runner.
+    i64 length = 1, i;
+    while((r = r->next) != NULL) length++;
+    while(length-- > 0) {
+        r = x.digits; i = 0;
+        // -Getting to the last unread digit.
+        while(i++ < length) {r = r->next;}
+        x.int64_to_8bytes(r->value, buffer);
+        s << (b0 = buffer[0]) << (b1 =buffer[1]) <<  (b2 = buffer[2])
+          << (b3 = buffer[3]) << (b4 = buffer[4]) << (b5 = buffer[5])
+          << (b6 = buffer[6]) << (b7 = buffer[7]);
+    }
+    return s;
+}
+
+void BigInteger::print() {
+    if(digits == NULL) return ;
+    char buffer[8];       // -Needed to safe the hexadecimal
+                          //  digits of the number.
+    BigInteger::Digit* r = digits;  // -Runner.
+    i64 length = 1, i;
+    while((r = r->next) != NULL) length++;
+    while(length-- > 0) {
+        r = digits; i = 0;
+        // -Getting to the last unread digit.
+        while(i++ < length) {r = r->next;}
+        int64_to_8bytes(r->value, buffer);
+        for(int i = 0; i < 8; i++) {
+            if((ui08)buffer[i] < 16) printf("0");
+            printf("%X", (ui08)buffer[i]);
+        }
+    }
+}
+
+void BigInteger::println() {
+    print();
+    printf("\n");
+}
+
 void BigInteger::setAsZero() {
     digits = new Digit(0);
     last = digits;
 }
 
 void BigInteger::append(ui64 x) {
+    if(digits == NULL) {
+        digits = new Digit(x);
+        last = digits;
+        return;
+    }
     last->next =  new Digit(x);
     last = last->next;
 }

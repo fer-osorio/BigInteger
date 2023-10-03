@@ -18,12 +18,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include<iostream>
-#include<cstdlib>
+#include"BigInteger.hpp"
 
-int main (void)
+int main(void)
 {
-  std::cout << "Hello, World!\n";
-  return EXIT_SUCCESS;
+    BigInteger big("FABC00677F5783FFFABC00677F5783FFFABC00677F5783FF");
+    //std::cout << big << '\n';
+    big.println();
+
+    return 0;
 }
 
