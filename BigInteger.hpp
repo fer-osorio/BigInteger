@@ -32,15 +32,24 @@ struct BigInteger {
 	public:
 	BigInteger();
 	BigInteger(i64);
+	BigInteger(const BigInteger&);
 	BigInteger(const char[], NumberBase = HEXADECIMAL);
 	BigInteger(const char[], ui64, bool = true);
 	BigInteger(const ui64[], unsigned, bool = true);
 
 	~BigInteger();
 
-	friend BigInteger operator + (BigInteger);
+	// Assignment
+	BigInteger& operator = (const BigInteger&);
+
+	// Arithmetic
+	friend BigInteger operator + (const BigInteger&, const BigInteger&);
 	friend BigInteger operator - (BigInteger);
 	friend BigInteger operator * (BigInteger);
+
+	// Comparison
+	bool operator == (int) const;
+
 	friend std::ostream& operator << (std::ostream&, BigInteger);
 
 	void print();
