@@ -12,6 +12,13 @@ BigInteger::BigInteger(i64 number) {
     last = digits;
 }
 
+BigInteger::BigInteger(Digit* d, bool pos) : Positive(pos) {
+    while(d != NULL) {
+        this->append(d->value);
+        d = d->next;
+    }
+}
+
 BigInteger::BigInteger(const BigInteger& a) : Positive(a.Positive) {
     Digit *aux = a.digits;
     while(aux != NULL) {
@@ -170,7 +177,8 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
     return *this;
 }
 
-// Some facts for operation in the ring of integers:
+// |||||||||||| Some facts for operation in the ring of integer ||||||||||||||
+
 // ·[0] (Euclidean division theorem) Given a pair of integers a,b, exist
 //      unique integers q,r such that a = q·b + r. Using notation for the
 //      operations in C++ we can write a = (a/b)*b + a%b.
@@ -179,18 +187,28 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
 // ·[3] x/2^n = x>>n and x*2^n = x<<n
 // ·[4] x%2^n = x&(2^n-1)
 
+//----------------------------------------------------------------------------
+
+// ||||||||| Algorithm for the sum of two positive numbers in base k |||||||||
+
 // -Set 'k' as any natural number bigger than 1
-// -Representation of a and b in digits base b:
+// -Representation of a and b in digits base k:
 //  a == a_{n}a_{n-1}...a_{1}a_{0} and b == b_{m}b_{n-1}...b_{1}b_{0}, where
 //  +) 0 <= a_i,b_j <= k-1 for each i\in{1,...,m} and j\in{1,...,m}
 
-//  Set carriage_{0} = 0 and s = max(m,n), call r = a + b, then:
-//  -r == r_{s+1}r_{s}...r_{1}r_{0} where
-//   1) r_{0} = (a_{0} + b_{0})%k and carriage_{0} = (a_{0} + b_{0})/k
-//   2) r_{i} = (a_{i} + b_{i} + carriage_{i-1})%k
-//      carriage_{i} = (a_{i}+b_{i}+carriage_{i-1})/k for each i\in{0,...,s}.
-//   3) r_{s+1} = carriage_{s}
-// -From (1), (2) and (+) we can see that 0 <= carriage_{i} <= 1.
+// -Set carriage_{0} = 0, suppose n <= m and call r = a + b, then:
+// -r == r_{m+1}r_{m}...r_{1}r_{0} where
+//  1) r_{0} = (a_{0} + b_{0})%k and carriage_{0} = (a_{0} + b_{0})/k
+//  2) r_{i} = (a_{i} + b_{i} + carriage_{i-1})%k
+//     carriage_{i} = (a_{i}+b_{i}+carriage_{i-1})/k for each i\in{0,...,n}.
+//  3) r_{i} = (b_{i} + carriage_{i-1})%k and
+//     carriage_{i} = (b_{i} + carriage_{i-1})/k for i \in {n+1,...,m}
+//  4) r_{m+1} = carriage_{m}
+// -From (1), (2), (3) and (+) we can see that 0 <= carriage_{i} <= 1.
+// -Notice that, from the definitions, for i\in{n+1,...,m}:
+//  ~ If b_{i} = k - 1 and carriage_{i} = 1, then r_{i} = 0 and
+//    carriage_{i} = 1; in any other case r_{i} = b_{i} + carriage_{i} and
+//    carriage_{i} = 0.
 
 // -Setting k = 2^64 we have
 //  i) 0 <= a_{i}+b_{i}+carriage_{i} <= 2^65 - 1.
@@ -202,9 +220,8 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
 //  I)  ra_{i} is exactly the first 64 bits.
 //  II) carriage_{i} is the value of the last bit (left most bit).
 
-// -Rewrite a_{i} as a_{i} = la_{i}^63 + ra_{i}, where
-//  la_{i} is its left most bit and ra_{i} if what remains, do the same
-//  with b_{i}, then
+// -Rewrite a_{i} as a_{i} = la_{i}^63 + ra_{i}, where la_{i} is its left most
+//  bit and ra_{i} is the 63 bits left, do the same with b_{i}, then
 //  · a_{i} + b_{i} + carriage_{i-1}
 //    = la_{i}^63 + ra_{i} + lb_{i}^63 + rb_{i} + carriage_{i-1}
 //    = (la_{i} + lb_{i})·2^63 + (ra_{i} +rb_{i} + carriage_{i-1})
@@ -222,8 +239,8 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
 //  (la_{i}+lb_{i})·2^63%2^64 = 0 and r_{i} = ra_{i} + rb_{i} + carriage_{i-1}
 
 // -Let la_{i} != lb_{i}, then la_{i} + lb_{i} = 1. Do the substitution
-//  x := ra_{i} + rb_{i} + carriage_{i-1}. From [1]
-//  x = (x/2^63)·2^63 + (x%2^63) [left most bit, last 62 bits]
+//  x := ra_{i} + rb_{i} + carriage_{i-1}. <~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//  From [1] x = (x/2^63)·2^63 + (x%2^63) [left most bit, last 63 bits]
 // -So:
 //  r_{i} = [2^63 + (x/2^63)·2^63 + (x%2^63)] % 2^64
 //        = [((1 + [x/2^63])·2^63) % 2^64 + [x%2^63] ] % 2^64
@@ -231,33 +248,69 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
 // -Therefore, the expression ((1 + [x/2^63])·2^63) % 2^64 is zero if and
 //  only if the First bit of x (from left to right) is one. In short
 //  <1> If the first bit of x is 1, then
-//      r_{i} = (ra_{i} + rb_{i} + carriage_{i-1})%2^63
+//      r_{i} = (ra_{i} + rb_{i} + carriage_{i-1})%2^63 = x & 2^63 - 1
 //  <2> If the first bit of x is 0, then
-//      r_{i} = 2^63 + ra_{i} + rb_{i} + carriage_{i-1}
+//      r_{i} = 2^63 + ra_{i} + rb_{i} + carriage_{i-1} = 2^63 + x
 
 // -Now we'll calculate the carriage_{i}'s. From 2), ·), [2] and using the
 //  same substitution with x:
 //  carriage_{i} =
 //      [(la_{i} + lb_{i})·2^63 + (ra_{i} +rb_{i} + carriage_{i-1})]/2^64 =
 //      [(la_{i} + lb_{i})·2^63 + x]/2^64 =
-//_X_:= [(la_{i} + lb_{i})·2^63]/2^64 + x/2^64 +
-//      ([(la_{i} + lb_{i})·2^63]%2^64 + x%2^64)/2^64
+//      [(la_{i} + lb_{i})·2^63]/2^64 + x/2^64 +
+//      ([(la_{i} + lb_{i})·2^63]%2^64 + x%2^64)/2^64 =: _X_
 // -Case 1: la_{i} = lb_{i} = 1, then _X_= 1 + 0 + (0 + x)/2^64 = 1
 // -Case 2: la_{i} = lb_{i} = 0, then _X_= 0 + 0 + (0 + x)/2^64 = 0
 // -Case 3: la_{i} != lb_{i}, then _X_= 0 + 0 + (2^63 + x)/2^64.
 //  2^63 + x >= 2^64 if and only if x >= 2^63 if and only if the first
-//  bit of x is 1, then _X_= 1 if x >= 2^63, _X_ = 0 otherwise.
+//  bit of x is 1, then _X_= 1 if first bit of x == 1, _X_ = 0 otherwise.
 
 BigInteger operator + (const BigInteger& a, const BigInteger& b) {
-    BigInteger r;
+    BigInteger::Digit* nonce = NULL;
+    BigInteger r(nonce);
     if(a.digits == NULL || b.digits == NULL) return r; // Nothing to do
 
-    BigInteger::Digit *da = a.digits, *db = b.digits;
-    while(da != NULL && db != NULL) {
+    ui64 la, lb, ra, rb, x;
+    ui64 carriage = 0;
 
+    BigInteger::Digit *da = a.digits, *db = b.digits, *largest = NULL;
+    while(da != NULL && db != NULL) {
+        la = da->value & BigInteger::ui64LeftMost_1; // -Left most bit
+        lb = db->value & BigInteger::ui64LeftMost_1; // -Left most bit
+        ra = da->value & BigInteger::ui64MAX >> 1; // -All but the left most
+        rb = db->value & BigInteger::ui64MAX >> 1; //  bit (in both cases).
+
+        x = ra + rb + carriage;
+
+        if(la == lb) {
+            r.append(x);
+            if(la > 0) carriage = 1;
+            else carriage = 0;
+        } else {
+            if((x & BigInteger::ui64LeftMost_1) > 0) {
+                r.append(x & BigInteger::ui64MAX >> 1);
+                carriage = 1;
+            } else { //  x + BigInteger::ui64LeftMost_1
+                r.append(x | BigInteger::ui64LeftMost_1);
+                carriage = 0;
+            }
+        }
         da = da->next;
         db = db->next;
     }
+    // -In case of having to numbers of different length if digits.
+    if(da != NULL) largest = da;
+    if(db != NULL) largest = db;
+    while(largest != NULL) {
+        if((carriage == 1) && (largest->value == BigInteger::ui64MAX))
+            r.append(0); // Preserve carriage as 1.
+        else {
+            r.append(largest->value + carriage);
+            carriage = 0;
+        }
+        largest = largest->next;
+    }
+    if(carriage == 1) r.append(1);
     return r;
 }
 
@@ -294,21 +347,45 @@ std::ostream& operator << (std::ostream& s, BigInteger x) {
 
 void BigInteger::print() {
     if(digits == NULL) return ;
-    char buffer[8];       // -Needed to safe the hexadecimal
-                          //  digits of the number.
-    BigInteger::Digit* r = digits;  // -Runner.
-    i64 length = 1, i;
+    char buffer[8];     // -Saves the hexadecimal digits of the number.
+    ui08 uVal;          // -Unsigned value.
+    Digit* r = digits;  // -Runs trough the digits.
+    bool nonZeroFoun = false;   // -Tells us if a nonzero character is found.
+    bool justZeros = true;      // -Tells us the first zero characters.
+
+    i64 length = 1, i = 0;  // -Length of the number.
     while((r = r->next) != NULL) length++;
+
+    // -Printing the first element
+    r = digits;
+    while(++i < length) {r = r->next;}
+    int64_to_8bytes(r->value, buffer);
+    for(i = 0; i < 8; i++) {
+        uVal = (ui08)buffer[i];
+        nonZeroFoun = nonZeroFoun || (uVal > 0); // -False till uVal > 0.
+        if(nonZeroFoun) {
+            if(i == 4) printf(",");
+            // nonZeroFound && justZeros == true means the first non zero
+            // value was found.
+            if(uVal < 16 && !justZeros) printf("0");
+            printf("%X", uVal);
+        }
+        justZeros = justZeros && (uVal == 0); // -True till uVal > 0.
+    } length--;
+
     while(length-- > 0) {
         r = digits; i = 0;
         // -Getting to the last unread digit.
         while(i++ < length) {r = r->next;}
         int64_to_8bytes(r->value, buffer);
-        for(int i = 0; i < 8; i++) {
-            if((ui08)buffer[i] < 16) printf("0");
-            printf("%X", (ui08)buffer[i]);
+        for(i = 0; i < 8; i++) {
+            if((i & 3) == 0) printf(",");
+            uVal = (ui08)buffer[i];
+            if(uVal < 16) printf("0");
+            printf("%X", uVal);
         }
     }
+    if(!nonZeroFoun) printf("0");
 }
 
 void BigInteger::println() {
@@ -329,6 +406,23 @@ void BigInteger::append(ui64 x) {
     }
     last->next =  new Digit(x);
     last = last->next;
+}
+
+ui64 BigInteger::pop() {
+    if(digits == NULL) return 0; // -This shold be handle by an exception.
+    ui64 r = last->value;
+    if(digits->next == NULL) {
+        if(r != digits->value) {/*Some exception here*/}
+        delete digits;
+        digits = last = NULL;
+        return r;
+    }
+    Digit* aux = digits;
+    while(aux->next->next != NULL) aux = aux->next;
+    delete last;
+    last = aux;
+    last->next = NULL;
+    return r;
 }
 
 void BigInteger::push(ui64 x) {

@@ -22,9 +22,12 @@
 
 int main(void)
 {
-    BigInteger big("FABC00677F5783FFFABC00677F5783FFFABC00677F5783FF");
+    BigInteger n0("FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFF");
+  //BigInteger n1("FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFF");
+    BigInteger n1(1);
+    BigInteger r = n0 + n1;
     //std::cout << big << '\n';
-    big.println();
+    r.println();
 
     return 0;
 }

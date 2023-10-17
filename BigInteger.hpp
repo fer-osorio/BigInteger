@@ -29,12 +29,16 @@ struct BigInteger {
 
 	bool Positive = true; // Sing. True for positive, false for negative.
 
+	static const ui64 ui64MAX = 0xFFFF'FFFF'FFFF'FFFF; // 64 1's.
+	static const ui64 ui64LeftMost_1 = 0x8000'0000'0000'0000; // 100...00
+
 	public:
 	BigInteger();
 	BigInteger(i64);
 	BigInteger(const BigInteger&);
-	BigInteger(const char[], NumberBase = HEXADECIMAL);
+	BigInteger(Digit*, bool = true);
 	BigInteger(const char[], ui64, bool = true);
+	BigInteger(const char[], NumberBase = HEXADECIMAL);
 	BigInteger(const ui64[], unsigned, bool = true);
 
 	~BigInteger();
