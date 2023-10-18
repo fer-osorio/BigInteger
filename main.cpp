@@ -24,7 +24,7 @@ int main(void)
 {
     BigInteger n0("FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFF");
   //BigInteger n1("FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFF");
-    BigInteger n1(1);
+    BigInteger n1(2);
     BigInteger r = n0 + n1;
     //std::cout << big << '\n';
     r.println();

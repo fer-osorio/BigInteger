@@ -67,6 +67,21 @@ struct BigInteger {
 	ui64 _8bytes_to_int64(const char[8]);
 	void int64_to_8bytes(const ui64, char[8]);
 	bool isValidDigit(char, NumberBase);
+
+	// -Addition of non-negative integers. This function will assume both
+	//  arguments are positive.
+	// -The result of the addition will be saved in the variable 'result'.
+	//  This is made in this way in order to avoid the copy of objects.
+	friend BigInteger& additionPositive(const BigInteger& a,
+										const BigInteger& b,
+										BigInteger& result);
+	// -Subtraction of non-negative integers. This function will assume both
+	//  arguments are positive.
+	// -The result of the subtraction will be saved in the variable 'result'.
+	//  This is made in this way in order to avoid the copy of objects.
+	friend BigInteger& subtractionPositive(const BigInteger& a,
+										   const BigInteger& b,
+										   BigInteger& result);
 };
 
 #endif
