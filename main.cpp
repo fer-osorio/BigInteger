@@ -22,12 +22,29 @@
 
 int main(void)
 {
-    BigInteger n0("FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFF");
-  //BigInteger n1("FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFF");
-    BigInteger n1(2);
-    BigInteger r = n0 + n1;
-    //std::cout << big << '\n';
-    r.println();
+    // -Using BigInteger(const char[], NumberBase = HEXADECIMAL) implicitly.
+    BigInteger n0="FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFF";
+    BigInteger n1="-FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFF";
+    //BigInteger n2 = 2;
+    //BigInteger n3 = "FFFF";
+
+    std::cout << "n0 =        " ; n0.println();
+    std::cout << "n1 =       "; n1.println(); std::cout << '\n';
+
+    std::cout << "n0 + -n1 =  "; (n0 + -n1).println();
+    std::cout << "n0 + n1  =  "; (n0 + n1).println();
+    std::cout << "n1 + n0  =  "; (n1 + n0).println();
+    std::cout << "n1 + -n0 = "; (n1 + -n0).println(); std::cout << '\n';
+
+    std::cout << "n0 - -n1 =  "; (n0 - -n1).println();
+    std::cout << "n0 - n1  =  "; (n0 - n1).println();
+    std::cout << "n1 - n0  = "; (n1 - n0).println();
+    std::cout << "-n0 - n1 =  "; (-n0 - n1).println(); std::cout << '\n';
+
+    std::cout << "n0 - 1   =  "; (n0 - 1).println();
+    std::cout << "n0 + 1   =  "; (n0 + 1).println();
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+    // Calling BigInteger(ui64) implicitly
 
     return 0;
 }

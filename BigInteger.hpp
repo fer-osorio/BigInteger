@@ -48,8 +48,10 @@ struct BigInteger {
 
 	// Arithmetic
 	friend BigInteger operator + (const BigInteger&, const BigInteger&);
-	friend BigInteger operator - (BigInteger);
-	friend BigInteger operator * (BigInteger);
+	friend BigInteger operator - (const BigInteger&, const BigInteger&);
+	friend BigInteger operator * (BigInteger&);
+
+	BigInteger operator - ();
 
 	// Comparison
 	bool operator == (int) const;
@@ -63,13 +65,14 @@ struct BigInteger {
 	void setAsZero();
 	void append(ui64);
 	void push(ui64);
-	ui64  pop(void);
+	ui64 pop(void);
 	ui64 _8bytes_to_int64(const char[8]);
 	void int64_to_8bytes(const ui64, char[8]);
 	bool isValidDigit(char, NumberBase);
 
 	// -Addition of non-negative integers. This function will assume both
-	//  arguments are positive.
+	//  arguments are positive. The 'Positive' attribute of the result is
+	//	never touched.
 	// -The result of the addition will be saved in the variable 'result'.
 	//  This is made in this way in order to avoid the copy of objects.
 	friend BigInteger& additionPositive(const BigInteger& a,
