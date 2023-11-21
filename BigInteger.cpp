@@ -545,38 +545,34 @@ BigInteger operator - (const BigInteger& a, const BigInteger& b) {
 
 void BigInteger::ui64Product(ui64 a, ui64 b, ui64 result[2]) const {
     ui64Toui32 _a_, _b_, _l64X_;
-    _a_.ui64int = a; // ua == _a_.uint[0], la == _a_.uint[1]
-    _b_.ui64int = b; // ub == _a_.uint[0], lb == _a_.uint[1]
-    ui64 _32ones = 0xFFFFFFFF; // first 32 bits are ones.
-    // lower 32 bits of a,   upper 32 bits of a
-    ui64 la = a & _32ones, ua = (a & (_32ones << 32)) >> 32;
-    // lower 32 bits of b,   upper 32 bits of b
-    ui64 lb = b & _32ones, ub = (b & (_32ones << 32)) >> 32;
+    _a_.ui64int = a; // ua == _a_.uint[1], la == _a_.uint[0]
+    _b_.ui64int = b; // ub == _a_.uint[1], lb == _a_.uint[0]
 
-    ui64 lalb = _a_.uint[1] * _b_.uint[1];
-    ui64 laub = _a_.uint[1] * _b_.uint[0];
-    ui64 ualb = _a_.uint[0] * _b_.uint[1];
-    ui64 uaub = _a_.uint[0] * _b_.uint[0];
+    // printf("\na = %lX, b = %lX", a, b); //debuggin purposes
+
+    ui64 lalb = (ui64)_a_.uint[0] * _b_.uint[0]; //printf("\nlalb = %lX",lalb);
+    ui64 laub = (ui64)_a_.uint[0] * _b_.uint[1]; //printf("\nlaub = %lX",laub);
+    ui64 ualb = (ui64)_a_.uint[1] * _b_.uint[0]; //printf("\nualb = %lX",ualb);
+    ui64 uaub = (ui64)_a_.uint[1] * _b_.uint[1]; //printf("\nuaub = %lX",uaub);
 
     ui64 l64X = laub + ualb, UX = 0;
-    if(l64X < laub) UX = (ui64)1 << 32;
-    _l64X_.ui64int = l64X; // u(l64X)=_l64X_.uint[0], l(l64X)=_l64X_.uint[1]
+    if(l64X < laub) UX = 1; // case laub + ualb >= 2^64
+    _l64X_.ui64int = l64X;  // u(l64X)=_l64X_.uint[0], l(l64X)=_l64X_.uint[1]
 
-    ui64 ulalb = (lalb & (_32ones << 32)) >> 32;
-    l64X = (ualb >> 1) + (laub >> 1) + (ulalb >> 1) +
-           (ualb & 1) + (laub & 1) + ((((ualb & 1) + laub) & 1) & (ulalb & 1));
-    UX   = (l64X & ((ui64)1 << 63)) >> 31;
-//                             [(ua·lb & 1 + la·ub) & 1 + u(la·lb)] & 1
-    l64X = (l64X << 1) + ( ( ( ( (ualb & 1) + laub) & 1) + ulalb) & 1);
 
-    result[0] = uaub + (l64X >> 32) + UX; // -The result array represents a
-    result[1] = (l64X << 32) + (lalb & _32ones);//number in big endian notation.
+    result[1] = (UX << 32) + uaub + (ui64)_l64X_.uint[1];
+    result[0] = ((ui64)_l64X_.uint[0] << 32) + lalb;
+
+    //printf("\nresult[0] = (%lX << 32) + %lX + %X", UX, uaub, _l64X_.uint[1]);
+    //printf("\nresult[1] = (%lX << 32) + %lX\n", (ui64)_l64X_.uint[0], lalb);
+
+    if(result[0] < lalb) ++result[1]; // case 2^32·l(l64(X)) + la·lb > 2^64
 }
 
 // -The following algorithm for multiplication of numbers of radix k was
 //  taken from Knut's book "The art of computer programming: Volume 2".
 
-BigInteger operator*(const BigInteger& a, const BigInteger& b) {
+BigInteger operator * (const BigInteger& a, const BigInteger& b) {
     BigInteger::Digit *nonce = NULL, *ad = a.digits, *bd = b.digits;
     BigInteger r(nonce); // Initializing with NULL list of digits.
     r.Positive = (a.Positive && b.Positive) || !(a.Positive || b.Positive);
@@ -590,20 +586,21 @@ BigInteger operator*(const BigInteger& a, const BigInteger& b) {
         //  'n' and 'm' digits, respectively), then, in this loop, we are
         //  initializing the first 'n' digits. with b[0] * a[i].
         a.ui64Product(ad->value, b.digits->value, t);
-        // -If t[1] + k >= 2^64 then aux = (t[1] + k)%2^64, (this is how C/C++
-        //  handle operations with unsigned integers), so aux < t[1], k ;this
-        //  last inequality happens if and only if t[1] + k >= 2^64.
-        aux = t[1] + k;
-        if(aux < k) { // Adding k to the number represented by the t array
-            ++t[0];
-            t[1] = aux;
-        } else {
-            t[1] += k;
-        }
-        printf("\nt[0,1] = [%lX, %lX]\n",t[0],t[1]); // Debugging purposes
-        r.append(t[1]); // r[i] = t mod 2^64
-        k = t[0];       // k = t / 2^64"
+
+        printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
+
+        // -If t[1] + k >= 2^64 then aux = (t[1] + k)%2^64 (this is how C/C++
+        //  handle operations with unsigned integers), so aux < t[1],k; this
+        aux = t[0] + k; // last inequality happens if and only if t[1]+k>=2^64
+        if(aux < k) ++t[1]; // In casee of t[0] + k > 2^64 - 1
+        t[0] = aux;
+
+        printf("\nt[1,0] = [%lX, %lX]\n",t[1],t[0]); // Debugging purposes
+
+        r.append(t[0]); // r[i] = t mod 2^64
+        k = t[1];       // k = t / 2^64"
         ad = ad->next;
+        std::cout << "\nr = "; r.println();// Debugging purposes
     }
     r.append(k); bd = bd->next;
     while(bd != NULL) { // -Initializing the next 'm' digits with zeros.
@@ -621,17 +618,25 @@ BigInteger operator*(const BigInteger& a, const BigInteger& b) {
         k = 0;
         while(ad != NULL) {
             a.ui64Product(ad->value, bd->value, t);
-            aux = t[1] + k;     // Adding k.
-            if(aux < k) ++t[0]; // Case t[1] + k >= 2^64
-            t[1] = aux;
-            aux = rrd->value + t[1]; // Adding non-updated value of the result
-            if(aux < t[1]) ++t[0];   // In case t[1] + rrd->value >= 2^64
-            t[1] = aux;
-            printf("\nt[0,1] = [%lX, %lX]\n",t[0],t[1]); // Debugging purposes
-            rrd->value = t[1]; // r[i] = t mod 2^64
-            k = t[0];          // k = t / 2^64
+
+            printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
+
+            aux = t[0] + k;     // Adding k.
+            if(aux < k) ++t[1]; // Case t[1] + k >= 2^64
+            t[0] = aux;
+            printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
+
+            aux = rrd->value + t[0]; // Adding non-updated value of the result
+            if(aux < t[0]) ++t[1];   // In case t[1] + rrd->value >= 2^64
+            t[0] = aux;
+
+            printf("\nt[1,0] = [%lX, %lX]\n",t[1],t[0]); // Debugging purposes
+
+            rrd->value = t[0]; // r[i] = t mod 2^64
+            k = t[1];          // k = t / 2^64
             ad = ad->next;
             rrd = rrd->next;
+            std::cout << "\nr = "; r.println();// Debugging purposes
         }
         rrd->value = k;// Leaving the last value of k in the next digit.
         rd = rd->next; // Next addition starts in the next digit of r.
@@ -640,6 +645,7 @@ BigInteger operator*(const BigInteger& a, const BigInteger& b) {
         ad = a.digits; // Resetting a.
         std::cout << "\nr = "; r.println();// Debugging purposes
     }
+    if(r.last->value  == 0) r.pop();
     return r;
 }
 
@@ -700,7 +706,6 @@ void BigInteger::print() {
         uVal = (ui08)buffer[i];
         nonZeroFoun = nonZeroFoun || (uVal > 0); // -False till uVal > 0.
         if(nonZeroFoun) {
-            if(i == 4) printf(",");
             // nonZeroFound && justZeros == true means the first non zero
             // value was found.
             if(uVal < 16 && !justZeros) printf("0");
@@ -715,7 +720,7 @@ void BigInteger::print() {
         while(i++ < length) {r = r->next;}
         int64_to_8bytes(r->value, buffer);
         for(i = 0; i < 8; i++) {
-            if((i & 3) == 0) printf(",");
+            if((i & 7) == 0) printf(",");
             uVal = (ui08)buffer[i];
             if(uVal < 16) printf("0");
             printf("%X", uVal);
@@ -730,6 +735,7 @@ void BigInteger::println() {
 }
 
 void BigInteger::setAsZero() {
+    this->~BigInteger();
     digits = new Digit(0);
     last = digits;
 }

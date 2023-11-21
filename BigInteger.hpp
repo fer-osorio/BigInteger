@@ -8,6 +8,7 @@
 #include<iostream>
 
 typedef std::uint64_t ui64;
+typedef std::int64_t   i64;
 typedef std::uint32_t ui32;
 typedef unsigned char ui08;
 

@@ -46,10 +46,10 @@ int main(void)
     std::cout << "n1 - n0  = "; (n1 - n0).println();
     std::cout << "-n0 - n1 =  "; (-n0 - n1).println(); std::cout << '\n';
     // Let 0 <= v <= w
-    // (2^w - 1)*(2^v - 1) = 2^{w+v} - (2^w + 2^v) + 1
+    // (2^w - 1)*(2^v - 1) = 2^{w+v} - 2^w - 2^v + 1
     //                     = 2^{w+v} - 2^v*(2^{w-v} + 1) + 1
     // (2^w - 1)^2 = 2^{2*w} - 2^{w+1} + 1
-    std::cout << "n0*n1  =  "; (n0*n1).println(); std::cout << '\n';
+    std::cout << "n0*-n1  =  "; (n0*-n1).println(); std::cout << '\n';
 
     return 0;
 }
