@@ -8,8 +8,18 @@
 #include<iostream>
 
 typedef std::uint64_t ui64;
-typedef std::int64_t   i64;
+typedef std::uint32_t ui32;
 typedef unsigned char ui08;
+
+union ui64Toui08 { // Cast from 64-bits unsigned integer to 8 unsigned char's
+	ui64 ui64int;
+	ui08 uchar[8];
+};
+
+union ui64Toui32 { // Cast from 64-bits unsigned integer to 2 unsigned int's
+	ui64 ui64int;
+	ui32 uint[2];
+};
 
 enum NumberBase {
 	BINARY,
@@ -33,7 +43,7 @@ struct BigInteger {
 	static const ui64 ui64LeftMost_1 = 0x8000'0000'0000'0000; // 100...00
 
 	public:
-	BigInteger();
+	BigInteger(); // -Initialize as zero.
 	BigInteger(i64);
 	BigInteger(const BigInteger&);
 	BigInteger(Digit*, bool = true);
@@ -49,7 +59,7 @@ struct BigInteger {
 	// Arithmetic
 	friend BigInteger operator + (const BigInteger&, const BigInteger&);
 	friend BigInteger operator - (const BigInteger&, const BigInteger&);
-	friend BigInteger operator * (BigInteger&);
+	friend BigInteger operator * (const BigInteger&, const BigInteger&);
 
 	BigInteger operator - ();
 
@@ -85,6 +95,8 @@ struct BigInteger {
 	friend BigInteger& subtractionPositive(const BigInteger& a,
 										   const BigInteger& b,
 										   BigInteger& result);
+	void ui64Addition(ui64, ui64, ui64[2]) const;
+	void ui64Product(ui64, ui64, ui64[2]) const;
 };
 
 #endif

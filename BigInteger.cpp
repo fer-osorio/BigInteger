@@ -162,6 +162,7 @@ BigInteger::~BigInteger() {
         this->digits = this->digits->next;
         delete aux;
     }
+    digits = last = NULL;
 }
 
 BigInteger& BigInteger::operator = (const BigInteger& a) {
@@ -182,10 +183,11 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
 // ·[0] (Euclidean division theorem) Given a pair of integers a,b, exist
 //      unique integers q,r such that a = q·b + r. Using notation for the
 //      operations in C++ we can write a = (a/b)*b + a%b.
-// ·[1] (x+y)%n = (x%n + y)%n = (x + y%n)%n = (x%n + y%n)%n
-// ·[2] (x+y)/n = x/n + y/n + (x%n + y%n)/n
-// ·[3] x/2^n = x>>n and x*2^n = x<<n
-// ·[4] x%2^n = x&(2^n-1)
+// ·[1] (x+y)%n = (x%n + y)%n = (x + y%n)%n = (x%n + y%n)%n.
+// ·[2] (x+y)/n = x/n + y/n + (x%n + y%n)/n.
+// ·[3] Sea 0 <= a,b < n, then (a + b)%n < a,b if and only if a + b > n.
+// ·[4] x/2^n = x>>n and x*2^n = x<<n.
+// ·[5] x%2^n = x&(2^n - 1).
 
 //----------------------------------------------------------------------------
 
@@ -467,6 +469,178 @@ BigInteger operator - (const BigInteger& a, const BigInteger& b) {
     }
     // Case 4: Operands are positive.
     return subtractionPositive(a, b, r);
+}
+
+// ||||||||||||||| Multiplication of integers of 64 bits |||||||||||||||||||||
+
+// -Having two arbitrary integers of 64 bits, compute its product and give
+//  the result in an array of two 64-bits integer.
+
+// Define the sets UI64 := {unsigned integers of 64 bits} and
+// UI32 := {unsigned integers of 32 bits}. Consider the functions
+// u:UI64 -> UI32 and l:UI64 -> UI32 defined as
+
+// *)  u(x) := ux were ux is the upper 32 bits of x.
+// **) l(x) := lx were lx is the lower 32 bits of x.
+
+// Then, for all x\in UI64, x can be rewrite as
+// ***) x = 2^32·u(x) + l(x)
+
+// Let a and b be two unsigned integers of 64 bits. By (***) we can write
+// a = 2^32·u(a) + l(a)
+// b = 2^32·u(b) + l(b)
+
+// Lets rename u(a) as ua, l(a) as la, u(b) as ub and l(b) as lb, then
+// I) a·b = (2^32·ua + la)·(2^32·ub + lb) =
+//        = 2^64·(ua·ub) + 2^32·(ua·lb) + 2^32·(la·ub) + la·lb
+//        = 2^64·(ua·ub) + 2^32·(ua·lb + la·ub) + la·lb
+//               |--1--|        |------2------|   |-3-|
+
+// Part 1 and 3 can be computed in 64 bits since they are the product of two
+// 32 bits integers. Part 2 can be seen as the addition of two 64 bits integer,
+// so we need 65 bits in order to know the result for arbitrary arguments. We
+// can solve this issue by using the fact the sum of unsigned integers in C++
+// the sum modulus 2^w where w can be 8, 16, 32 or 64 (bit length of the word
+// containing the integer), and the facts about integers (see above) number 3
+// to determine the value of the most significant bit (65th bit) of part 2.
+// More in concrete:
+
+// +) Bit 65 of ua·lb + la·ub is 1 if and only if ua·lb + la·ub > 2^64 if and
+// only if ua·lb, la·ub > (ua·lb + la·ub)% 2^64, this last expression is sum
+// of unsigned integers of 64 bits in C++.
+
+// In order to continue, consider the sets UI65 := {Integers of 65 bits} and
+// the functions U:UI65->{0,1}, l64:UI65 -> UI64 defined as
+
+// U(x)   := Ux   were Ux is the most significant bit.
+// l64(x) := l64x were l64x is the lower 64 bits of x.
+
+// Define X := ua·lb + la·ub, then we can write X = 2^64·U(X) + l64(X), and we
+// can calculate U(x) as mentioned above in (+). Notice that l64(X) = (ua·lb +
+// la·ub)%2^64.
+
+// Using (I) and the above results we can write
+// a·b = 2^64·(ua·ub) + 2^32·(2^64·U(X) + l64(X)) + la·lb
+//     = 2^96·U(X) + 2^64·(ua·ub) + 2^32·l64(X) + la·lb
+
+// Dividing l64(X) into its upper and lower part we obtain
+// II) a·b = 2^96·U(X)+2^64·(ua·ub) + 2^64·u(l64(X)) + 2^32·l(l64(X)) + la·lb
+//         = 2^64·(2^32·U(X) + (ua·ub) + u(l64(X))) + 2^32·l(l64(X)) + la·lb
+//                |---------------r1--------------|  |----------r0----------|
+
+// We almost have the result. From the definition of X we got
+// 0 <= X <= 2·(2^64 - 2·2^32 + 1), so 0 <= l64(X) <= 2^64 - 2·2^32 + 1, and
+// 0 <= u(l64(X)), l(l64(X)) <= 2^32 - 2·2^16 + 1.
+// With this inequalities:
+// r1 = 2^32·U(X) + (ua·ub) + u(l64(X)) <= 2^32+(2^64-2·2^32+1)+2^32-2·2^16+1
+//                                       = 2^64 - 2^17 + 2 < 2^64
+// So 2^32·U(X) + (ua·ub) + u(l64(X)) can be computed in 64 bits. This is not
+// the case for r0 because in the worst scenario this is what we got
+// 2^32·l(l64(X)) + la·lb = 2^32·(2^32-2·2^16+1) + la·lb
+//                        = 2^64 - 2·2^48 + 2^32 + 2^64 - 2·2^32 + 1
+//                        = 2^64 + 2^64 - 2·2^48 + 2^32 + 1 > 2^64
+// But these won't be a problem because we can use the same technique we used
+// with the computation of X; in this case, if 2^32·l(l64(X)) + la·lb > 2^64,
+// then we add 1 to r1.
+
+void BigInteger::ui64Product(ui64 a, ui64 b, ui64 result[2]) const {
+    ui64Toui32 _a_, _b_, _l64X_;
+    _a_.ui64int = a; // ua == _a_.uint[0], la == _a_.uint[1]
+    _b_.ui64int = b; // ub == _a_.uint[0], lb == _a_.uint[1]
+    ui64 _32ones = 0xFFFFFFFF; // first 32 bits are ones.
+    // lower 32 bits of a,   upper 32 bits of a
+    ui64 la = a & _32ones, ua = (a & (_32ones << 32)) >> 32;
+    // lower 32 bits of b,   upper 32 bits of b
+    ui64 lb = b & _32ones, ub = (b & (_32ones << 32)) >> 32;
+
+    ui64 lalb = _a_.uint[1] * _b_.uint[1];
+    ui64 laub = _a_.uint[1] * _b_.uint[0];
+    ui64 ualb = _a_.uint[0] * _b_.uint[1];
+    ui64 uaub = _a_.uint[0] * _b_.uint[0];
+
+    ui64 l64X = laub + ualb, UX = 0;
+    if(l64X < laub) UX = (ui64)1 << 32;
+    _l64X_.ui64int = l64X; // u(l64X)=_l64X_.uint[0], l(l64X)=_l64X_.uint[1]
+
+    ui64 ulalb = (lalb & (_32ones << 32)) >> 32;
+    l64X = (ualb >> 1) + (laub >> 1) + (ulalb >> 1) +
+           (ualb & 1) + (laub & 1) + ((((ualb & 1) + laub) & 1) & (ulalb & 1));
+    UX   = (l64X & ((ui64)1 << 63)) >> 31;
+//                             [(ua·lb & 1 + la·ub) & 1 + u(la·lb)] & 1
+    l64X = (l64X << 1) + ( ( ( ( (ualb & 1) + laub) & 1) + ulalb) & 1);
+
+    result[0] = uaub + (l64X >> 32) + UX; // -The result array represents a
+    result[1] = (l64X << 32) + (lalb & _32ones);//number in big endian notation.
+}
+
+// -The following algorithm for multiplication of numbers of radix k was
+//  taken from Knut's book "The art of computer programming: Volume 2".
+
+BigInteger operator*(const BigInteger& a, const BigInteger& b) {
+    BigInteger::Digit *nonce = NULL, *ad = a.digits, *bd = b.digits;
+    BigInteger r(nonce); // Initializing with NULL list of digits.
+    r.Positive = (a.Positive && b.Positive) || !(a.Positive || b.Positive);
+
+    if(a.digits == NULL || b.digits == NULL) {return r;} // exception here
+    if(a == 0 || b == 0) return BigInteger();            // Returns Zero
+    std::cout << '\n';
+    ui64 t[2], k = 0, aux;
+    while(ad != NULL) { // -Initializing the result.
+        // -Supposing a = a[n-1]...a[0] and b = b[m-1]...b[0] (numbers of
+        //  'n' and 'm' digits, respectively), then, in this loop, we are
+        //  initializing the first 'n' digits. with b[0] * a[i].
+        a.ui64Product(ad->value, b.digits->value, t);
+        // -If t[1] + k >= 2^64 then aux = (t[1] + k)%2^64, (this is how C/C++
+        //  handle operations with unsigned integers), so aux < t[1], k ;this
+        //  last inequality happens if and only if t[1] + k >= 2^64.
+        aux = t[1] + k;
+        if(aux < k) { // Adding k to the number represented by the t array
+            ++t[0];
+            t[1] = aux;
+        } else {
+            t[1] += k;
+        }
+        printf("\nt[0,1] = [%lX, %lX]\n",t[0],t[1]); // Debugging purposes
+        r.append(t[1]); // r[i] = t mod 2^64
+        k = t[0];       // k = t / 2^64"
+        ad = ad->next;
+    }
+    r.append(k); bd = bd->next;
+    while(bd != NULL) { // -Initializing the next 'm' digits with zeros.
+        r.append(0);
+        bd = bd->next;
+    }
+    std::cout << "\nr = "; r.println();// Debugging purposes
+    ad = a.digits;
+    bd = b.digits->next; // In this line we know that b.digits != NULL
+    // -Since we now got a * b[0], r.digits it's not NULL and the algorithm
+    //  demand to start the sum in the next digit of r, this is r[1].
+    // 'rrd' can be interpreted as "running over result digits"
+    BigInteger::Digit *rd = r.digits->next, *rrd = rd;
+    while(bd != NULL) {
+        k = 0;
+        while(ad != NULL) {
+            a.ui64Product(ad->value, bd->value, t);
+            aux = t[1] + k;     // Adding k.
+            if(aux < k) ++t[0]; // Case t[1] + k >= 2^64
+            t[1] = aux;
+            aux = rrd->value + t[1]; // Adding non-updated value of the result
+            if(aux < t[1]) ++t[0];   // In case t[1] + rrd->value >= 2^64
+            t[1] = aux;
+            printf("\nt[0,1] = [%lX, %lX]\n",t[0],t[1]); // Debugging purposes
+            rrd->value = t[1]; // r[i] = t mod 2^64
+            k = t[0];          // k = t / 2^64
+            ad = ad->next;
+            rrd = rrd->next;
+        }
+        rrd->value = k;// Leaving the last value of k in the next digit.
+        rd = rd->next; // Next addition starts in the next digit of r.
+        rrd = rd;      // Updating the 'runner' variable.
+        bd = bd->next; // Next multiplication gonna be with next digit of b.
+        ad = a.digits; // Resetting a.
+        std::cout << "\nr = "; r.println();// Debugging purposes
+    }
+    return r;
 }
 
 bool BigInteger::operator == (int x) const{
