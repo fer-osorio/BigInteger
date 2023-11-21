@@ -22,21 +22,20 @@ union ui64Toui32 { // Cast from 64-bits unsigned integer to 2 unsigned int's
 	ui32 uint[2];
 };
 
-enum NumberBase {
-	BINARY,
-	QUATERNARY,
-	OCTAL,
-	HEXADECIMAL,
-	DECIMAL
-};
-
 struct BigInteger {
+	enum NumberBase {
+		BINARY,
+		QUATERNARY,
+		OCTAL,
+		HEXADECIMAL,
+		DECIMAL
+	};
 	private: struct Digit {
 		ui64 value;
 		Digit* next;
 		Digit() : value(0), next(NULL) {}
 		Digit(ui64 _value) : value(_value), next(NULL) {}
-	}*digits = NULL, *last = NULL;
+	}*first = NULL, *last = NULL;
 
 	bool Positive = true; // Sing. True for positive, false for negative.
 
@@ -48,8 +47,19 @@ struct BigInteger {
 	BigInteger(i64);
 	BigInteger(const BigInteger&);
 	BigInteger(Digit*, bool = true);
+
+	// -Initializing with an array of bytes (char's). Little endianess is
+	//  used.
 	BigInteger(const char[], ui64, bool = true);
+
+	// -Initializing from a formafted string. The characters will be
+	//  interpreted accordingly to the number base selected.
+	// -The expression is read from left to right, considering the leftmost
+	//  characters as the most significant digits.
+	// -Just valid characters are read.
 	BigInteger(const char[], NumberBase = HEXADECIMAL);
+
+	// Initializing with a ui64 array. Little endianess is used.
 	BigInteger(const ui64[], unsigned, bool = true);
 
 	~BigInteger();
@@ -69,8 +79,8 @@ struct BigInteger {
 
 	friend std::ostream& operator << (std::ostream&, BigInteger);
 
-	void print();
-	void println();
+	void printHex() const;
+	void printHexln() const;
 
 	private:
 	void setAsZero();
@@ -96,7 +106,6 @@ struct BigInteger {
 	friend BigInteger& subtractionPositive(const BigInteger& a,
 										   const BigInteger& b,
 										   BigInteger& result);
-	void ui64Addition(ui64, ui64, ui64[2]) const;
 	void ui64Product(ui64, ui64, ui64[2]) const;
 };
 

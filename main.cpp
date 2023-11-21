@@ -28,28 +28,29 @@ int main(void)
     //BigInteger n2 = 2;
     //BigInteger n3 = "FFFF";
 
-    std::cout << "n0 =        " ; n0.println();
-    std::cout << "n1 =       "; n1.println(); std::cout << '\n';
+    std::cout << "n0 =        " ; n0.printHexln();
+    std::cout << "n1 =       "; n1.printHexln(); std::cout << '\n';
 
-    std::cout << "n0 - 1   =  "; (n0 - 1).println();
-    std::cout << "n0 + 1   =  "; (n0 + 1).println();
+    std::cout << "n0 - 1   =  "; (n0 - 1).printHexln();
+    std::cout << "n0 + 1   =  "; (n0 + 1).printHexln();
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
     // Calling BigInteger(ui64) implicitly)
 
-    std::cout << "n0 + -n1 =  "; (n0 + -n1).println();
-    std::cout << "n0 + n1  =  "; (n0 + n1).println();
-    std::cout << "n1 + n0  =  "; (n1 + n0).println();
-    std::cout << "n1 + -n0 = "; (n1 + -n0).println(); std::cout << '\n';
+    std::cout << "n0 + -n1 =  "; (n0 + -n1).printHexln();
+    std::cout << "n0 + n1  =  "; (n0 + n1).printHexln();
+    std::cout << "n1 + n0  =  "; (n1 + n0).printHexln();
+    std::cout << "n1 + -n0 = "; (n1 + -n0).printHexln(); std::cout << '\n';
 
-    std::cout << "n0 - -n1 =  "; (n0 - -n1).println();
-    std::cout << "n0 - n1  =  "; (n0 - n1).println();
-    std::cout << "n1 - n0  = "; (n1 - n0).println();
-    std::cout << "-n0 - n1 =  "; (-n0 - n1).println(); std::cout << '\n';
+    std::cout << "n0 - -n1 =  "; (n0 - -n1).printHexln();
+    std::cout << "n0 - n1  =  "; (n0 - n1).printHexln();
+    std::cout << "n1 - n0  = "; (n1 - n0).printHexln();
+    std::cout << "-n0 - n1 =  "; (-n0 - n1).printHexln(); std::cout << '\n';
     // Let 0 <= v <= w
     // (2^w - 1)*(2^v - 1) = 2^{w+v} - 2^w - 2^v + 1
     //                     = 2^{w+v} - 2^v*(2^{w-v} + 1) + 1
     // (2^w - 1)^2 = 2^{2*w} - 2^{w+1} + 1
-    std::cout << "n0*-n1  =  "; (n0*-n1).println(); std::cout << '\n';
+    std::cout << "n0*-n1  =  "; (n0*-n1).printHexln();
+    std::cout << "n0*n1  =  "; (n0*n1).printHexln(); std::cout << '\n';
 
     return 0;
 }

@@ -1,6 +1,6 @@
 #include"BigInteger.hpp"
 
-BigInteger::BigInteger() : digits(new Digit()), last(digits), Positive(true) {}
+BigInteger::BigInteger() : first(new Digit()), last(first), Positive(true) {}
 
 BigInteger::BigInteger(i64 number) {
     if(number < 0) {
@@ -8,8 +8,8 @@ BigInteger::BigInteger(i64 number) {
         number = -number;
     } else
         Positive = true;
-    digits = new Digit((ui64)number);
-    last = digits;
+    this->first = new Digit((ui64)number);
+    this->last = this->first;
 }
 
 BigInteger::BigInteger(Digit* d, bool pos) : Positive(pos) {
@@ -20,7 +20,7 @@ BigInteger::BigInteger(Digit* d, bool pos) : Positive(pos) {
 }
 
 BigInteger::BigInteger(const BigInteger& a) : Positive(a.Positive) {
-    Digit* aux = a.digits;
+    Digit* aux = a.first;
     while(aux != NULL) {
         this->append(aux->value);
         aux = aux->next;
@@ -34,17 +34,17 @@ BigInteger::BigInteger(const ui64 array[], unsigned size, bool positive)
         return;
     }
     unsigned i = 1;
-    digits = new Digit(array[0]);
-    last = digits;
+    this->first = new Digit(array[0]);
+    this->last = this->first;
     while(i < size) {
-        last->next = new Digit(array[i++]);
-        last = last->next;
+        this->last->next = new Digit(array[i++]);
+        this->last = last->next;
     }
 }
 
 BigInteger::BigInteger(const char str[], NumberBase base) {
     int strlen = -1, validCharCount = 0, bitsOccupied = 0;
-    int lowerLimit = 0; // -O if no negative sign, 1 in other case
+    int lowerLimit = 0; // -0 if no negative sign, 1 in other case
     int value = 0;      // -Holds number value of ascii character.
     if(base > 4) base = (NumberBase)3;
     while(str[++strlen] != 0) {}
@@ -61,7 +61,7 @@ BigInteger::BigInteger(const char str[], NumberBase base) {
             while(--strlen >= lowerLimit) {
                 if(str[strlen] == '1' || str[strlen] == '0') {
                     if(bitsOccupied == 0) append(0);
-                    last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
+                    this->last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
                     validCharCount++;
                     bitsOccupied = validCharCount & 63;
                 }
@@ -71,7 +71,7 @@ BigInteger::BigInteger(const char str[], NumberBase base) {
             while(--strlen >= lowerLimit) {
                 if(str[strlen] > 47 && str[strlen] < 52 ) {
                     if(bitsOccupied == 0) append(0);
-                    last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
+                    this->last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
                     validCharCount++;
                     bitsOccupied = (validCharCount << 1) & 63;
                 }
@@ -81,7 +81,7 @@ BigInteger::BigInteger(const char str[], NumberBase base) {
             while(--strlen >= lowerLimit) {
                 if(str[strlen] > 47 && str[strlen] < 56 ) {
                     if(bitsOccupied == 0) append(0);
-                    last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
+                    this->last->value |= (ui64)(str[strlen] - 48) << bitsOccupied;
                     validCharCount++;
                     bitsOccupied = (validCharCount * 3) & 63;
                 }
@@ -104,7 +104,7 @@ BigInteger::BigInteger(const char str[], NumberBase base) {
                 }
                 if(validHexChar) {
                     if(bitsOccupied == 0) append(0);
-                    last->value |= (ui64)value << bitsOccupied;
+                    this->last->value |= (ui64)value << bitsOccupied;
                     validCharCount++;
                     bitsOccupied = (validCharCount << 2) & 63;
                 }
@@ -127,49 +127,43 @@ BigInteger::BigInteger(const char bytes[], ui64 size, bool positive)
     }
     ui64 q = size >> 3; // q = size / 8;
     ui64 r = size &  7; // r = size % 8;
-    ui64 buffer = 0;
-    ui64 i = 0;
+    ui64Toui08 buffer; buffer.ui64int = 0;
+    ui64 i = 0, j;
 
     if(q == 0) {
         while(i < r) {
-            buffer <<= 8;
-            buffer |= (ui64)(ui08)bytes[i++];
+            buffer.uchar[i] = (ui08)bytes[i];
         }
-        digits = new Digit(buffer);
-        last = digits;
+        this->first = new Digit(buffer.ui64int);
+        this->last = this->first;
         return;
     }
-    if(r > 0) {
-        while(i < r) {
-            buffer <<= 8;
-            buffer |= (ui64)(ui08)bytes[i++];
-        }
-        digits = new Digit(buffer);
-        last = digits;
-        i += r;
-    } else {
-        digits = new Digit(_8bytes_to_int64(bytes));
-        last = digits;
-        i += 8;
+    for(i = 0; i < q; i += 8) {
+        for(j = 0; j < 8 ; j++) buffer.uchar[j] = (ui08)bytes[i+j];
+        this->append(buffer.ui64int);
     }
-    for(; i < q; i += 8) push(_8bytes_to_int64(&bytes[i]));
+    if(r > 0) {
+        buffer.ui64int = 0;
+        for(j = 0; j < r ; j++) buffer.uchar[j] = (ui08)bytes[i+j];
+        this->append(buffer.ui64int);
+    }
 }
 
 BigInteger::~BigInteger() {
     Digit* aux;
-    while(digits != NULL) {
-        aux = this->digits;
-        this->digits = this->digits->next;
+    while(this->first != NULL) {
+        aux = this->first;
+        this->first = this->first->next;
         delete aux;
     }
-    digits = last = NULL;
+    this->first = this->last = NULL;
 }
 
 BigInteger& BigInteger::operator = (const BigInteger& a) {
     if(this != &a) { // Guarding against self assignment.
         this->~BigInteger();
         this->Positive = a.Positive;
-        Digit *aux = a.digits;
+        Digit *aux = a.first;
         while(aux != NULL) {
             this->append(aux->value);
             aux = aux->next;
@@ -272,16 +266,16 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
 
 BigInteger& additionPositive(const BigInteger& a, const BigInteger& b,
 							 BigInteger& result) {
-	if(result.digits != NULL) {
+	if(result.first != NULL) {
 	    result.~BigInteger();
-	    result.digits = result.last = NULL;
+	    result.first = result.last = NULL;
 	}
-	if(a.digits == NULL || b.digits == NULL) return result; // Exception here
+	if(a.first == NULL || b.first == NULL) return result; // Exception here
 
     ui64 la, lb, ra, rb, x;
     ui64 carriage = 0;
 
-    BigInteger::Digit *da = a.digits, *db = b.digits, *largest = NULL;
+    BigInteger::Digit *da = a.first, *db = b.first, *largest = NULL;
     while(da != NULL && db != NULL) {
         la = da->value & BigInteger::ui64LeftMost_1; // -Left most bit
         lb = db->value & BigInteger::ui64LeftMost_1; // -Left most bit
@@ -385,15 +379,15 @@ BigInteger operator + (const BigInteger& a, const BigInteger& b) {
 BigInteger& subtractionPositive(const BigInteger& a,
 								const BigInteger& b,
 								BigInteger& result) {
-    if(result.digits != NULL) {
+    if(result.first != NULL) {
 	    result.~BigInteger();
-	    result.digits = result.last = NULL;
+	    result.first = result.last = NULL;
 	}
-	if(a.digits == NULL || b.digits == NULL) return result; // Exception here
+	if(a.first == NULL || b.first == NULL) return result; // Exception here
 
 	ui64 load = 0;
 	bool aIsBigger = false;
-	BigInteger::Digit *d0 = a.digits, *d1 = b.digits;
+	BigInteger::Digit *d0 = a.first, *d1 = b.first;
 
 	while(d0 != NULL && d1 != NULL) { // Determining the biggest number.
         if(d0->value >= d1->value) aIsBigger = true;
@@ -404,12 +398,12 @@ BigInteger& subtractionPositive(const BigInteger& a,
 	if(d0 != NULL && d0->value != 0) aIsBigger = true;
 	if(aIsBigger) {
 	    result.Positive = true;
-	    d0 = a.digits;
-	    d1 = b.digits;
+	    d0 = a.first;
+	    d1 = b.first;
 	} else {
 	    result.Positive = false;
-	    d0 = b.digits;
-	    d1 = a.digits;
+	    d0 = b.first;
+	    d1 = a.first;
 	}
     while(d0 != NULL && d1 != NULL) {
         if((d0->value < d1->value) || (d0->value == d1->value && load == 1)) {
@@ -443,7 +437,7 @@ BigInteger& subtractionPositive(const BigInteger& a,
     }
     // -Erasing the leftmost zeros till find a nonzero element or till
     //  we have just one element in the list.
-    while(result.last != result.digits && result.last->value == 0)
+    while(result.last != result.first && result.last->value == 0)
           result.pop();
 
     return result;
@@ -573,21 +567,21 @@ void BigInteger::ui64Product(ui64 a, ui64 b, ui64 result[2]) const {
 //  taken from Knut's book "The art of computer programming: Volume 2".
 
 BigInteger operator * (const BigInteger& a, const BigInteger& b) {
-    BigInteger::Digit *nonce = NULL, *ad = a.digits, *bd = b.digits;
+    BigInteger::Digit *nonce = NULL, *ad = a.first, *bd = b.first;
     BigInteger r(nonce); // Initializing with NULL list of digits.
     r.Positive = (a.Positive && b.Positive) || !(a.Positive || b.Positive);
 
-    if(a.digits == NULL || b.digits == NULL) {return r;} // exception here
+    if(a.first == NULL || b.first == NULL) {return r;} // exception here
     if(a == 0 || b == 0) return BigInteger();            // Returns Zero
-    std::cout << '\n';
+    //std::cout << '\n';
     ui64 t[2], k = 0, aux;
     while(ad != NULL) { // -Initializing the result.
         // -Supposing a = a[n-1]...a[0] and b = b[m-1]...b[0] (numbers of
         //  'n' and 'm' digits, respectively), then, in this loop, we are
         //  initializing the first 'n' digits. with b[0] * a[i].
-        a.ui64Product(ad->value, b.digits->value, t);
+        a.ui64Product(ad->value, b.first->value, t);
 
-        printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
+        //printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
 
         // -If t[1] + k >= 2^64 then aux = (t[1] + k)%2^64 (this is how C/C++
         //  handle operations with unsigned integers), so aux < t[1],k; this
@@ -595,81 +589,81 @@ BigInteger operator * (const BigInteger& a, const BigInteger& b) {
         if(aux < k) ++t[1]; // In casee of t[0] + k > 2^64 - 1
         t[0] = aux;
 
-        printf("\nt[1,0] = [%lX, %lX]\n",t[1],t[0]); // Debugging purposes
+        //printf("\nt[1,0] = [%lX, %lX]\n",t[1],t[0]); // Debugging purposes
 
         r.append(t[0]); // r[i] = t mod 2^64
         k = t[1];       // k = t / 2^64"
         ad = ad->next;
-        std::cout << "\nr = "; r.println();// Debugging purposes
+        //std::cout << "\nr = "; r.printHexln();// Debugging purposes
     }
     r.append(k); bd = bd->next;
     while(bd != NULL) { // -Initializing the next 'm' digits with zeros.
         r.append(0);
         bd = bd->next;
     }
-    std::cout << "\nr = "; r.println();// Debugging purposes
-    ad = a.digits;
-    bd = b.digits->next; // In this line we know that b.digits != NULL
+    //std::cout << "\nr = "; r.printHexln();// Debugging purposes
+    ad = a.first;
+    bd = b.first->next; // In this line we know that b.digits != NULL
     // -Since we now got a * b[0], r.digits it's not NULL and the algorithm
     //  demand to start the sum in the next digit of r, this is r[1].
     // 'rrd' can be interpreted as "running over result digits"
-    BigInteger::Digit *rd = r.digits->next, *rrd = rd;
+    BigInteger::Digit *rd = r.first->next, *rrd = rd;
     while(bd != NULL) {
         k = 0;
         while(ad != NULL) {
             a.ui64Product(ad->value, bd->value, t);
 
-            printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
+            //printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
 
             aux = t[0] + k;     // Adding k.
             if(aux < k) ++t[1]; // Case t[1] + k >= 2^64
             t[0] = aux;
-            printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
+            //printf("\nt[1,0] = [%lX, %lX]",t[1],t[0]); // Debugging purposes
 
             aux = rrd->value + t[0]; // Adding non-updated value of the result
             if(aux < t[0]) ++t[1];   // In case t[1] + rrd->value >= 2^64
             t[0] = aux;
 
-            printf("\nt[1,0] = [%lX, %lX]\n",t[1],t[0]); // Debugging purposes
+            //printf("\nt[1,0] = [%lX, %lX]\n",t[1],t[0]); // Debugging purposes
 
             rrd->value = t[0]; // r[i] = t mod 2^64
             k = t[1];          // k = t / 2^64
             ad = ad->next;
             rrd = rrd->next;
-            std::cout << "\nr = "; r.println();// Debugging purposes
+            //std::cout << "\nr = "; r.printHexln();// Debugging purposes
         }
         rrd->value = k;// Leaving the last value of k in the next digit.
         rd = rd->next; // Next addition starts in the next digit of r.
         rrd = rd;      // Updating the 'runner' variable.
         bd = bd->next; // Next multiplication gonna be with next digit of b.
-        ad = a.digits; // Resetting a.
-        std::cout << "\nr = "; r.println();// Debugging purposes
+        ad = a.first; // Resetting a.
+        //std::cout << "\nr = "; r.printHexln();// Debugging purposes
     }
     if(r.last->value  == 0) r.pop();
     return r;
 }
 
 bool BigInteger::operator == (int x) const{
-    if(this->digits == NULL) return false; // No comparison at all.
-    if(this->digits->next != NULL && this->digits->next->value != 0)
+    if(this->first == NULL) return false; // No comparison at all.
+    if(this->first->next != NULL && this->first->next->value != 0)
     return false;// In this point, this is necessarily bigger than x
 
     bool positive = x > 0; // Signs are equal and values are equal.
-    return positive == this->Positive && this->digits->value == (ui64)x;
+    return positive == this->Positive && this->first->value == (ui64)x;
 }
 
 std::ostream& operator << (std::ostream& s, BigInteger x) {
-    if(x.digits == NULL) return s << "";
+    if(x.first == NULL) return s << "";
     char buffer[8];       // -Needed to safe the hexadecimal
                           //  digits of the number.
     // -buffer contents gets "unreachable" once out of the
     //  function, so we need to save the content in other place
     char b0, b1, b2, b3, b4, b5, b6, b7;
-    BigInteger::Digit* r = x.digits;  // -Runner.
+    BigInteger::Digit* r = x.first;  // -Runner.
     i64 length = 1, i;
     while((r = r->next) != NULL) length++;
     while(length-- > 0) {
-        r = x.digits; i = 0;
+        r = x.first; i = 0;
         // -Getting to the last unread digit.
         while(i++ < length) {r = r->next;}
         x.int64_to_8bytes(r->value, buffer);
@@ -686,80 +680,75 @@ BigInteger BigInteger::operator - () {
     return r;
 }
 
-void BigInteger::print() {
-    if(this->digits == NULL) return ;
-    char buffer[8];     // -Saves the hexadecimal digits of the number.
-    ui08 uVal;          // -Unsigned value.
-    Digit* r = this->digits;    // -Runs trough the digits.
-    bool nonZeroFoun = false;   // -Tells us if a nonzero character is found.
-    bool justZeros = true;      // -Tells us the first zero characters.
+void BigInteger::printHex() const {
+    if(this->first == NULL) return ;
+    Digit* r = this->first;    // -Runs trough the digits.
+    ui64Toui08 buffer;
 
-    i64 length = 1, i = 0;  // -Length of the number.
-    while((r = r->next) != NULL) length++;
+    i64 length = 1, i = 0;
+    while((r = r->next) != NULL) length++; // -Length of the number.
 
-    if(this->Positive == false) printf("-");
-    // -Printing the first element
-    r = this->digits;
-    while(++i < length) {r = r->next;}
-    int64_to_8bytes(r->value, buffer);
-    for(i = 0; i < 8; i++) {
-        uVal = (ui08)buffer[i];
-        nonZeroFoun = nonZeroFoun || (uVal > 0); // -False till uVal > 0.
-        if(nonZeroFoun) {
-            // nonZeroFound && justZeros == true means the first non zero
-            // value was found.
-            if(uVal < 16 && !justZeros) printf("0");
-            printf("%X", uVal);
+    if(!this->Positive) printf("-");
+    r = this->first;
+
+    while(++i < length) {r = r->next;} // Reaching end of digits list
+    buffer.ui64int = r->value;          // From ui64 to ui08[8]
+
+    // Printing first list element
+    for(i = 7; i > 0 && buffer.uchar[i] == 0; i--) {} // Ignoring left zeros
+    if(i == 0) { // In case of having 7 zero bytes
+        printf("%X",buffer.uchar[i]);
+    } else
+        for(; i > 0; i--) { // Printing non-zero bytes
+            if(buffer.uchar[i] < 10) printf("0");
+            printf("%X",buffer.uchar[i]);
         }
-        justZeros = justZeros && (uVal == 0); // -True till uVal > 0.
-    } length--;
+    --length;
 
-    while(length-- > 0) {
-        r = this->digits; i = 0;
+    while(0 < length--) {
+        printf(",");
+        r = this->first; i = 0;
         // -Getting to the last unread digit.
         while(i++ < length) {r = r->next;}
-        int64_to_8bytes(r->value, buffer);
-        for(i = 0; i < 8; i++) {
-            if((i & 7) == 0) printf(",");
-            uVal = (ui08)buffer[i];
-            if(uVal < 16) printf("0");
-            printf("%X", uVal);
+        buffer.ui64int = r->value;
+        for(i = 7; i >= 0; i--) { // Printing non-zero bytes
+            if(buffer.uchar[i] < 10) printf("0");
+            printf("%X",buffer.uchar[i]);
         }
     }
-    if(!nonZeroFoun) printf("0");
 }
 
-void BigInteger::println() {
-    print();
+void BigInteger::printHexln() const {
+    printHex();
     printf("\n");
 }
 
 void BigInteger::setAsZero() {
     this->~BigInteger();
-    digits = new Digit(0);
-    last = digits;
+    this->first = new Digit(0);
+    this->last = this->first;
 }
 
 void BigInteger::append(ui64 x) {
-    if(digits == NULL) {
-        digits = new Digit(x);
-        last = digits;
+    if(this->first == NULL) {
+        this->first = new Digit(x);
+        this->last = this->first;
         return;
     }
-    last->next =  new Digit(x);
-    last = last->next;
+    this->last->next =  new Digit(x);
+    this->last = this->last->next;
 }
 
 ui64 BigInteger::pop() {
-    if(digits == NULL) return 0; // -This shold be handle by an exception.
+    if(this->first == NULL) return 0; // -This shold be handle by an exception.
     ui64 r = this->last->value;
-    if(this->digits->next == NULL) {
-        if(r != this->digits->value) {/*Some exception here*/}
-        delete this->digits;
-        this->digits = this->last = NULL;
+    if(this->first->next == NULL) {
+        if(r != this->first->value) {/*Some exception here*/}
+        delete this->first;
+        this->first = this->last = NULL;
         return r;
     }
-    Digit* aux = this->digits;
+    Digit* aux = this->first;
     while(aux->next->next != NULL) aux = aux->next;
     delete this->last;
     this->last = aux;
@@ -769,8 +758,8 @@ ui64 BigInteger::pop() {
 
 void BigInteger::push(ui64 x) {
     Digit* _digits = new Digit(x);
-    _digits->next = this->digits;
-    this->digits = _digits;
+    _digits->next = this->first;
+    this->first = _digits;
 }
 
 ui64 BigInteger::_8bytes_to_int64(const char bytes[8]) {
