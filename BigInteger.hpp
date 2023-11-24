@@ -87,8 +87,6 @@ struct BigInteger {
 	void append(ui64);
 	void push(ui64);
 	ui64 pop(void);
-	ui64 _8bytes_to_int64(const char[8]);
-	void int64_to_8bytes(const ui64, char[8]);
 	bool isValidDigit(char, NumberBase);
 
 	// -Addition of non-negative integers. This function will assume both
@@ -106,7 +104,6 @@ struct BigInteger {
 	friend BigInteger& subtractionPositive(const BigInteger& a,
 										   const BigInteger& b,
 										   BigInteger& result);
-	void ui64Product(ui64, ui64, ui64[2]) const;
 };
-
+void ui64Product(ui64, ui64, ui64[2]);
 #endif

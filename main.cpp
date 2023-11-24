@@ -49,8 +49,8 @@ int main(void)
     // (2^w - 1)*(2^v - 1) = 2^{w+v} - 2^w - 2^v + 1
     //                     = 2^{w+v} - 2^v*(2^{w-v} + 1) + 1
     // (2^w - 1)^2 = 2^{2*w} - 2^{w+1} + 1
-    std::cout << "n0*-n1  =  "; (n0*-n1).printHexln();
-    std::cout << "n0*n1  =  "; (n0*n1).printHexln(); std::cout << '\n';
+    std::cout << "n0*(-n1+1) =  "; (n0*(-n1+1)).printHexln();
+    std::cout << "n0*n1      = "; (n0*n1).printHexln(); std::cout << '\n';
 
     return 0;
 }
