@@ -35,7 +35,7 @@ struct BigInteger {
 		Digit* next;
 		Digit() : value(0), next(NULL) {}
 		Digit(ui64 _value) : value(_value), next(NULL) {}
-	}*first = NULL, *last = NULL;
+	}*first = NULL, *last = NULL; // First digit is the least significant. Last digit is the most significant.
 
 	bool Positive = true; // Sing. True for positive, false for negative.
 
@@ -46,11 +46,8 @@ struct BigInteger {
 	BigInteger(); // -Initialize as zero.
 	BigInteger(i64);
 	BigInteger(const BigInteger&);
-	BigInteger(Digit*, bool = true);
-
-	// -Initializing with an array of bytes (char's). Little endianess is
-	//  used.
-	BigInteger(const char[], ui64, bool = true);
+	BigInteger(Digit*, bool); // Initializing with a list of digits and sing.
+	BigInteger(const char[], ui64, bool = true); // -Initializing with an array of bytes (char's). Little endianess is used.
 
 	// -Initializing from a formafted string. The characters will be
 	//  interpreted accordingly to the number base selected.
@@ -71,7 +68,6 @@ struct BigInteger {
 	friend BigInteger operator + (const BigInteger&, const BigInteger&);
 	friend BigInteger operator - (const BigInteger&, const BigInteger&);
 	friend BigInteger operator * (const BigInteger&, const BigInteger&);
-
 	BigInteger operator - ();
 
 	// Comparison
@@ -104,6 +100,19 @@ struct BigInteger {
 	friend BigInteger& subtractionPositive(const BigInteger& a,
 										   const BigInteger& b,
 										   BigInteger& result);
+	// -Computes the quotient divisor/dividend and the remainder
+	//	divisor%dividend, where the divided is a single precision number. The
+	//  result is saved in the 'result' array in the form [divisor/dividend,
+	//	divisor%dividend].
+	friend void shortDivision(const BigInteger&  divisor,
+							  const ui64 dividend,
+							  BigInteger result[2]);
+	// -Computes the quotient divisor/dividend and the remainder
+	//	divisor%dividend. The result is saved in the 'result' array
+	//	in the form [divisor/dividend, divisor%dividend].
+	friend void quotientRemainder(const BigInteger&  divisor,
+								  const BigInteger& dividend,
+								  BigInteger result[2]);
 };
 void ui64Product(ui64, ui64, ui64[2]);
 #endif

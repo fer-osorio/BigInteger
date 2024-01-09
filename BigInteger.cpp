@@ -268,7 +268,6 @@ BigInteger& additionPositive(const BigInteger& a, const BigInteger& b,
 							 BigInteger& result) {
 	if(result.first != NULL) {
 	    result.~BigInteger();
-	    result.first = result.last = NULL;
 	}
 	if(a.first == NULL || b.first == NULL) return result; // Exception here
 
@@ -318,7 +317,7 @@ BigInteger& additionPositive(const BigInteger& a, const BigInteger& b,
 
 BigInteger operator + (const BigInteger& a, const BigInteger& b) {
     BigInteger::Digit* nonce = NULL;
-    BigInteger r(nonce);
+    BigInteger r(nonce, true);
 
     // Case 1: Operands are negative.
     if(a.Positive == false && b.Positive == false) {
@@ -445,7 +444,7 @@ BigInteger& subtractionPositive(const BigInteger& a,
 
 BigInteger operator - (const BigInteger& a, const BigInteger& b) {
     BigInteger::Digit* nonce = NULL;
-    BigInteger r(nonce);
+    BigInteger r(nonce, true);
 
     // Case 1: Operands are negative.
     if(a.Positive == false && b.Positive == false) {
@@ -544,10 +543,10 @@ void ui64Product(ui64 a, ui64 b, ui64 result[2]) {
 
     // printf("\na = %lX, b = %lX", a, b); //debuggin purposes
 
-    ui64 lalb = (ui64)_a_.uint[0] * _b_.uint[0]; //printf("\nlalb = %lX",lalb);
-    ui64 laub = (ui64)_a_.uint[0] * _b_.uint[1]; //printf("\nlaub = %lX",laub);
-    ui64 ualb = (ui64)_a_.uint[1] * _b_.uint[0]; //printf("\nualb = %lX",ualb);
-    ui64 uaub = (ui64)_a_.uint[1] * _b_.uint[1]; //printf("\nuaub = %lX",uaub);
+    ui64 lalb = (ui64)_a_.uint[0] * _b_.uint[0];//printf("\nlalb = %lX",lalb);
+    ui64 laub = (ui64)_a_.uint[0] * _b_.uint[1];//printf("\nlaub = %lX",laub);
+    ui64 ualb = (ui64)_a_.uint[1] * _b_.uint[0];//printf("\nualb = %lX",ualb);
+    ui64 uaub = (ui64)_a_.uint[1] * _b_.uint[1];//printf("\nuaub = %lX",uaub);
 
     ui64 l64X = laub + ualb, UX = 0;
     if(l64X < laub) UX = 1; // case laub + ualb >= 2^64
@@ -568,7 +567,7 @@ void ui64Product(ui64 a, ui64 b, ui64 result[2]) {
 
 BigInteger operator * (const BigInteger& a, const BigInteger& b) {
     BigInteger::Digit *nonce = NULL, *ad = a.first, *bd = b.first;
-    BigInteger r(nonce); // Initializing with NULL list of digits.
+    BigInteger r(nonce, true); // Initializing with NULL list of digits.
     r.Positive = (a.Positive && b.Positive) || !(a.Positive || b.Positive);
 
     if(a.first == NULL || b.first == NULL) {return r;} // exception here
@@ -649,6 +648,26 @@ BigInteger operator * (const BigInteger& a, const BigInteger& b) {
     return r;
 }
 
+void shortDivision(const BigInteger& divisor, const ui64 dividend,
+				   BigInteger result[2]) {
+	if(result[0].first != NULL) result[0].~BigInteger();                         // -Before start, we "destroy" what is inside the 'result' array.
+	if(result[1].first != NULL) result[1].~BigInteger();
+	if(dividend == 0) {/*Exception here*/}
+	if(divisor  == 0) {/*Some code here*/}
+
+	BigInteger::Digit* nonce = NULL, *pd;
+	BigInteger tmp(nonce, true); // BigInteger with empty (NULL) digits list.
+
+	for(pd = divisor.first ; pd != NULL; pd = pd->next) { // Inverting the order of the digits.
+	    tmp.push(pd->value);
+	}
+	ui64 r = 0, currQuo[2] = {0,0};
+	result[0] = BigInteger(nonce, true);
+	for(pd = tmp.first; pd != NULL; pd = pd->next) {
+
+	}
+}
+
 bool BigInteger::operator == (int x) const{
     if(this->first == NULL) return false; // No comparison at all.
     if(this->first->next != NULL && this->first->next->value != 0)
@@ -726,7 +745,7 @@ void BigInteger::append(ui64 x) {
 }
 
 ui64 BigInteger::pop() {
-    if(this->first == NULL) return 0; // -This shold be handle by an exception.
+    if(this->first == NULL) return 0;                                            //- This should be handle by an exception.
     ui64 r = this->last->value;
     if(this->first->next == NULL) {
         if(r != this->first->value) {/*Some exception here*/}
