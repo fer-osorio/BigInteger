@@ -1,8 +1,6 @@
-// -Handling numbers of an arbitrary size. The limit is the size of the RAM
-//  available.
-
+// -Handling numbers of an arbitrary size. The limit is the size of the RAM available.
 #ifndef _BIGINTEGER_INCLUDED_
-#define _BIGINTEGER_INCLUDED_
+#define  _BIGINTEGER_INCLUDED_
 
 #include<cstdint>
 #include<iostream>
@@ -15,6 +13,11 @@ typedef unsigned char ui08;
 union ui64Toui08 { // Cast from 64-bits unsigned integer to 8 unsigned char's
 	ui64 ui64int;
 	ui08 uchar[8];
+};
+
+union ui32Toui08 { // Cast from 32-bits unsigned integer to 4 unsigned char's
+	ui32 ui32int;
+	ui08 uchar[4];
 };
 
 union ui64Toui32 { // Cast from 64-bits unsigned integer to 2 unsigned int's
@@ -31,33 +34,32 @@ struct BigInteger {
 		DECIMAL
 	};
 	private: struct Digit {
-		ui64 value;
+		ui32   value;		   // Here we set our radix to 2^32
 		Digit* next;
 		Digit() : value(0), next(NULL) {}
-		Digit(ui64 _value) : value(_value), next(NULL) {}
-	}*first = NULL, *last = NULL; // First digit is the least significant. Last digit is the most significant.
+		Digit(ui32 _value) : value(_value), next(NULL) {}
+	};
+	struct Digit *first = NULL; // First digit is the least significant.
+	struct Digit *last = NULL; // Last digit is the most significant.
 
-	bool Positive = true; // Sing. True for positive, false for negative.
+	bool Positive = true; 	   // Sing. True for positive, false for negative.
 
-	static const ui64 ui64MAX = 0xFFFF'FFFF'FFFF'FFFF; // 64 1's.
-	static const ui64 ui64LeftMost_1 = 0x8000'0000'0000'0000; // 100...00
+	static const ui32 ui32MAX = 0xFFFFFFFF;					  // 32 bits, all 1's.
+	static const ui64 ui64MAX = 0xFFFFFFFFFFFFFFFF; 		  // 64 bits, all 1's.
+	static const ui64 ui64LeftMost_1 = 0x8000'0000'0000'0000; // 64 bits, only the most significant is 1
 
 	public:
-	BigInteger(); // -Initialize as zero.
+	inline BigInteger(): first(new Digit()), last(first), Positive(true) {}; // -Initialize as zero.
 	BigInteger(i64);
 	BigInteger(const BigInteger&);
-	BigInteger(Digit*, bool); // Initializing with a list of digits and sing.
-	BigInteger(const char[], ui64, bool = true); // -Initializing with an array of bytes (char's). Little endianess is used.
+	BigInteger(Digit*, bool); 					// Initializing with a list of digits and sing.
+	BigInteger(const char[], ui64, bool = true);// -Initializing with an array of bytes (char's). Little endianess is used.
 
-	// -Initializing from a formafted string. The characters will be
-	//  interpreted accordingly to the number base selected.
-	// -The expression is read from left to right, considering the leftmost
-	//  characters as the most significant digits.
+	BigInteger(const char[], NumberBase = HEXADECIMAL); // -Initializing from a formatted string. The characters will be interpreted accordingly to the number base selected.
+	// -The expression is read from left to right, considering the leftmost characters as the most significant digits.
 	// -Just valid characters are read.
-	BigInteger(const char[], NumberBase = HEXADECIMAL);
 
-	// Initializing with a ui64 array. Little endianess is used.
-	BigInteger(const ui64[], unsigned, bool = true);
+	BigInteger(const ui32[], unsigned, bool = true);	// Initializing with a ui32 array. Little endianess is used.
 
 	~BigInteger();
 
@@ -80,9 +82,9 @@ struct BigInteger {
 
 	private:
 	void setAsZero();
-	void append(ui64);
-	void push(ui64);
-	ui64 pop(void);
+	void append(ui32);
+	void push(ui32);
+	ui32 pop(void);
 	bool isValidDigit(char, NumberBase);
 
 	// -Addition of non-negative integers. This function will assume both
