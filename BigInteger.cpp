@@ -238,62 +238,6 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
 //  ~ If b_{i} = k - 1 and carriage_{i} = 1, then r_{i} = 0 and
 //    carriage_{i} = 1; in any other case r_{i} = b_{i} + carriage_{i} and
 //    carriage_{i} = 0.
-
-// -Setting k = 2^64 we have
-//  i) 0 <= a_{i}+b_{i}+carriage_{i} <= 2^65 - 1.
-// -As a result of the last inequality, we'll need 65 bits to hold the result
-//  of that sum for arbitrary arguments. Our objective is to determine, using
-//  operations in 64 bits, each of the r_{i}'s and each the carriage_{i}'s.
-
-// -From equities 1),2) and inequality i) it follows that
-//  I)  ra_{i} is exactly the first 64 bits.
-//  II) carriage_{i} is the value of the last bit (left most bit).
-
-// -Rewrite a_{i} as a_{i} = la_{i}^63 + ra_{i}, where la_{i} is its left most
-//  bit and ra_{i} is the 63 bits left, do the same with b_{i}, then
-//  · a_{i} + b_{i} + carriage_{i-1}
-//    = la_{i}^63 + ra_{i} + lb_{i}^63 + rb_{i} + carriage_{i-1}
-//    = (la_{i} + lb_{i})·2^63 + (ra_{i} +rb_{i} + carriage_{i-1})
-
-// -From definition and (+) follows that
-//  ··)  0 <= ra_{i} + rb_{i} + carriage_{i-1} <= 2^64-1
-//  ···) 0 <= la_{i} + lb_{i} <= 2
-
-// -Now we can write:
-//  r_{i} = (a_{i} + b_{i} + carriage_{i-1})%2^64
-//        = [(la_{i} + lb_{i})·2^63 + (ra_{i} +rb_{i} + carriage_{i-1})]%2^64
-//  (**)  = [(la_{i} + lb_{i})·2^63 % 2^64 +
-//          ra_{i} + rb_{i} + carriage_{i-1}] % 2^64
-// -From (**) follows that if la_{i} = lb_{i} = 1 or la_{i} = lb_{i} = 0 then
-//  (la_{i}+lb_{i})·2^63%2^64 = 0 and r_{i} = ra_{i} + rb_{i} + carriage_{i-1}
-
-// -Let la_{i} != lb_{i}, then la_{i} + lb_{i} = 1. Do the substitution
-//  x := ra_{i} + rb_{i} + carriage_{i-1}. <~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//  From [1] x = (x/2^63)·2^63 + (x%2^63) [left most bit, last 63 bits]
-// -So:
-//  r_{i} = [2^63 + (x/2^63)·2^63 + (x%2^63)] % 2^64
-//        = [((1 + [x/2^63])·2^63) % 2^64 + [x%2^63] ] % 2^64
-//  First bit of x~~~~^   Last 63 bits of x~~~~^
-// -Therefore, the expression ((1 + [x/2^63])·2^63) % 2^64 is zero if and
-//  only if the First bit of x (from left to right) is one. In short
-//  <1> If the first bit of x is 1, then
-//      r_{i} = (ra_{i} + rb_{i} + carriage_{i-1})%2^63 = x & 2^63 - 1
-//  <2> If the first bit of x is 0, then
-//      r_{i} = 2^63 + ra_{i} + rb_{i} + carriage_{i-1} = 2^63 + x
-
-// -Now we'll calculate the carriage_{i}'s. From 2), ·), [2] and using the
-//  same substitution with x:
-//  carriage_{i} =
-//      [(la_{i} + lb_{i})·2^63 + (ra_{i} +rb_{i} + carriage_{i-1})]/2^64 =
-//      [(la_{i} + lb_{i})·2^63 + x]/2^64 =
-//      [(la_{i} + lb_{i})·2^63]/2^64 + x/2^64 +
-//      ([(la_{i} + lb_{i})·2^63]%2^64 + x%2^64)/2^64 =: _X_
-// -Case 1: la_{i} = lb_{i} = 1, then _X_= 1 + 0 + (0 + x)/2^64 = 1
-// -Case 2: la_{i} = lb_{i} = 0, then _X_= 0 + 0 + (0 + x)/2^64 = 0
-// -Case 3: la_{i} != lb_{i}, then _X_= 0 + 0 + (2^63 + x)/2^64.
-//  2^63 + x >= 2^64 if and only if x >= 2^63 if and only if the first
-//  bit of x is 1, then _X_= 1 if first bit of x == 1, _X_ = 0 otherwise.
-
 // ---------------------------------------------------------------------------
 
 BigInteger& additionPositive(const BigInteger& a, const BigInteger& b,
@@ -318,26 +262,6 @@ BigInteger& additionPositive(const BigInteger& a, const BigInteger& b,
         tmp.ui64int = (ui64)da->value + (ui64)db->value + carriage;
         result.append(tmp.uint[0]);
         carriage = tmp.uint[1];
-        /*la = da->value & BigInteger::ui64LeftMost_1;    // -Left most bit
-        lb = db->value & BigInteger::ui64LeftMost_1;    // -Left most bit
-        ra = da->value & BigInteger::ui64MAX >> 1;      // -All but the left most
-        rb = db->value & BigInteger::ui64MAX >> 1;      //  bit (in both cases).
-
-        x = ra + rb + carriage;
-
-        if(la == lb) {
-            result.append(x);
-            if(la > 0) carriage = 1;
-            else carriage = 0;
-        } else {
-            if((x & BigInteger::ui64LeftMost_1) > 0) {
-                result.append(x & BigInteger::ui64MAX >> 1);
-                carriage = 1;
-            } else { //  x + BigInteger::ui64LeftMost_1
-                result.append(x | BigInteger::ui64LeftMost_1);
-                carriage = 0;
-            }
-        }*/
         da = da->next;
         db = db->next;
     }
@@ -394,28 +318,6 @@ BigInteger operator + (const BigInteger& a, const BigInteger& b) {
 //     r_{0} += k and loan_{i} = 1, in other case set loan_{i} = 0.
 //  3) For i\in{m+1,..,n} : r_{i} = a_{i} - loan_{i-1}; if r_{i} < 0,
 //     r_{i} += k and set loan_{i} = 1, in other case set loan_{i} = 0.
-
-// -In our case, we are using unsigned integers of 64 bits, so the comparisons
-//  r_{i} < 0 and r_{0} < 0 are useless (they're always false). Fortunately
-//  we don't have to use them; from their definition:
-
-//  *  r_{0} < 0 if and only if a_{0} < b_{0} and
-//  ** r_{i} < 0 if and only if a_{i} < b_{i} + load
-
-// -(*) can be evaluated easily, (**) is a bit more complicated. If we have
-//  b_{i} == 2^64 - 1, then b_{i} + 1 == 2^64 witch is congruent with
-//  zero mod 2^64 (Remember that the arithmetic of unsigned integers is the
-//  arithmetic of modular integers, where the value of the modulus is the
-//  maximum value for the unsigned integer plus one, in this case is 2^64).
-//  In other words,if b_{i} == 2^64 - 1, a_{i} == b_{i} and load == 1, then
-//  [a_{i} < b_{i}+load] == [2^64 - 1 < 2^64%2^64] == [2^64 - 1 < 0] == false,
-//  witch is something we do not want. Luckily, the only values that load
-//  takes are 0 and 1, therefore
-
-//  *** a_{i} < b_{i} + load if and only if a_{i} < b_{i} or a_{i} == b_{i}
-//      and load == 1.
-
-// -Finally, for (3) we got r_{i} < 0 if and only if a_{i} == 0 and load == 1.
 
 BigInteger& subtractionPositive(const BigInteger& a,const BigInteger& b,BigInteger& result) {
     if(result.first != NULL) {
