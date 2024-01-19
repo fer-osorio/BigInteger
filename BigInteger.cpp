@@ -573,8 +573,7 @@ BigInteger operator * (const BigInteger& a, const BigInteger& b) {
     return r;
 }
 
-void shortDivision(const BigInteger& divisor, const ui64 dividend,
-				   BigInteger result[2]) {
+void shortDivisionPositive(const BigInteger& dividend, const ui32 divisor, BigInteger result[2]) {
 	if(result[0].first != NULL) result[0].~BigInteger(); // -Before start, we "destroy" what is inside the 'result' array.
 	if(result[1].first != NULL) result[1].~BigInteger();
 	if(dividend == 0) {/*Exception here*/}
@@ -583,29 +582,170 @@ void shortDivision(const BigInteger& divisor, const ui64 dividend,
 	BigInteger::Digit* nonce = NULL, *pd;
 	BigInteger tmp(nonce, true); // BigInteger with empty (NULL) digits list.
 
-	for(pd = divisor.first ; pd != NULL; pd = pd->next) { // Inverting the order of the digits.
+	for(pd = dividend.first ; pd != NULL; pd = pd->next) { // Inverting the order of the digits.
 	    tmp.push(pd->value);
 	}
-	ui64 r = 0, currQuo[2] = {0,0};
+	ui64 r = 0;
+	ui64Toui32 t;
 	result[0] = BigInteger(nonce, true);
 	for(pd = tmp.first; pd != NULL; pd = pd->next) {
-
+        t.uint[1] = r; t.uint[0] = pd->value; // t = r*2^32 + pd->value
+        result[0].push(t.ui64int/divisor);
+        r = t.ui64int % divisor;
 	}
+	while(result[0].last->value == 0 && result[0].first != result[0].last) result[0].pop(); // Deleting left zeros (unless quotient == 0)
+	result[1] = BigInteger((i64)r);
+}
+
+//  Quotient remainder sign
+
+// -Let a,b be integers, a,b != 0. From euclidean division theorem a = q[a]·b + r where 0 <= r < |b|. Let a,b be positive and supose r > 0.
+// -First  case: -a = (-q[a])·b - r = (-q[a])·b - b + b - r = (-(q[a]+1))·b + (b-r); Since 0 < r < b, then 0 < b-r < b implying -a/b = -(a/b+1) y -a%b = b - a%b.
+// -Second case:  a = q[a]·b + r = q[a]·-(-b) + r = (-q[a])·(-b) + r, therefore a/-b = -(a/b) & a%-b = a%b
+// -Third  case: -a = -(q[a]·b + r) = q[a]·(-b) - r = (q[a]+1)·(-b) + (b-r); reasoning similarly to the first case .we have -a/-b = (a/b)+1 and -a%-b = b - a%b.
+
+void shortDivision(const BigInteger& dividend, ui32 divisor, BigInteger result[2]) {
+    if(divisor == 0) { /*Exception here*/ return;}
+
+    shortDivisionPositive(dividend, (ui32)divisor, result); // Computing the [quotient,reminder] as if the arguments were both positive
+    if(dividend.Positive == false) {                        // Numerator is negative
+        if(result[1] != 0) {                                // The remainder is not zero, then...
+            ++result[0];                                    // Using -a/b = -(a/b + 1)
+            result[1].Positive = false;                     // Using -a%b = b - a%b.
+            result[1].plusEqualPositive(divisor);
+        }
+        if(result[0] != 0) result[0].Positive = false;      // Changing sign of quotient if and only if the quotient is not zero.
+    }
+}
+
+void shortDivision(const BigInteger& dividend, int divisor, BigInteger result[2]) {
+    if(divisor == 0) { /*Exception here*/ return;}
+
+    bool divisorPositive;
+    if(divisor > 0) divisorPositive = true;                             // Saving the sign and changing to positive if necessary
+    else {
+        divisorPositive = false;
+        divisor = -divisor;
+    }
+    shortDivisionPositive(dividend, (ui32)divisor, result);             // Computing the [quotient,reminder] as if the arguments were both positive
+    if(dividend.Positive == false) {                                    // Numerator is negative
+        if(result[1] != 0) {                                            // The remainder is not zero, then...
+            ++result[0];                                                // Using -a/b = -(a/b + 1) and -a/-b = (a/b) + 1
+            result[1].Positive = false;                                 // Using -a%b = b - a%b and -a%-b = b - a%b.
+            result[1] += divisor;
+        }
+        if(divisorPositive && result[0]!=0) result[0].Positive = false; // Changing sign of quotient if and only if divisor is positive and quotient is not zero.
+        return;
+    }
+    if(dividend.Positive == true && !divisorPositive) {                 // Numerator is positive and denominator is negative.
+        result[0].Positive = false;                                     // a/-b = -(a/b) & a%-b = a%b
+        return;
+    }
 }
 
 bool BigInteger::operator == (int x) const{
     if(this->first == NULL) return false; // No comparison at all.
-    if(this->first->next != NULL && this->first->next->value != 0)
-        return false;// In this point, this is necessarily bigger than x
+    if(this->first->next != NULL) return false; // At this point, this is necessarily bigger than x
 
-    bool positive = x > 0; // Signs are equal and values are equal.
-    return positive == this->Positive && this->first->value == (ui64)x;
+    bool positive = x >= 0; // Saving the sign of x
+    if(x < 0) x = -x;       // Saving absolute value of x
+    if(x == 0 && this->first->value == 0) return true;  // Special case; zero can have any of the signs.
+    return positive == this->Positive && this->first->value == (ui32)x;
+}
+
+bool BigInteger::operator != (int x) const {
+    return !(*this == x);
 }
 
 BigInteger BigInteger::operator - () {
     BigInteger r = *this;
     r.Positive = !this->Positive;
     return r;
+}
+
+BigInteger& BigInteger::operator++() {
+    Digit *td = this->first;    // this digits
+
+    if(this->Positive == true) {
+        while(td != NULL && td->value == BigInteger::ui32MAX) { // Moving the carriage to the next digit
+            td->value = 0;
+            td = td->next;
+        }
+        if(td != NULL) ++td->value; // Finally we add the carriage
+        else this->append(1);
+    }
+    else {
+        if(*this == 0)  { this->setAsOne();  return *this;} // Cases where the zero is involved.
+        if(*this == -1) { this->setAsZero(); return *this;}
+        while(td != NULL && td->value == 0) { // Moving the loan to the next digit
+            td->value = BigInteger::ui32MAX;
+            td = td->next;
+        }
+        if(td != NULL) {
+            --td->value; // Finally we add the carriage
+            if(td == this->last && td->value == 0) this->pop();
+        }
+        else {/*Exception here: The most significant digit can't be zero*/}
+    }
+    return *this;
+}
+
+BigInteger& BigInteger::operator -- () {
+    this->Positive = !this->Positive; // Using x-1 = -(-x + 1)
+    this->operator++();
+    if(this->operator==(0)) this->Positive = !this->Positive; // If it's zero it already has the correct sign (Positive)
+    return *this;
+}
+
+void BigInteger::plusEqualPositive(ui32 x) {// Assuming this BigInteger is positive.
+    Digit* td = this->first;   // This digits
+    ui64Toui32 t = {0};
+    t.ui64int = td->value + x;// Adding to the first element
+    td->value = t.uint[0];    // first element = (td->value + v) % 2^32
+    if(t.uint[1] > 0) {       // We have a non zero carriage (carriage = 1)
+        for(td = td->next; td != NULL && td->value == BigInteger::ui32MAX; td = td->next) {
+            // While the value of the current "Digit" is ui32MAX (2^32-1) we'll change that value to zero and preserve the carriage
+            td->value = 0;
+        }
+            if(td == NULL) this->append(1); // Depositing the carriage in a new digit
+        else ++td->value;                   // Adding the carriage to a digit which value is not 2^32-1
+    }
+}
+
+void BigInteger::minusEqualPositive(ui32 x) {// Assuming this BigInteger is positive.
+    Digit *td = this->first;     // This digits
+    if(x > td->value) {         // Here we need a loan from the next digit.
+        if(td->next == NULL) {  // In case of single precision number.
+            td->value = x - td->value;
+            this->Positive = !this->Positive;
+            return;
+        }
+        //td->value = BigInteger::ui32MAX - (ui32)v + td->value + 1;
+        td->value += BigInteger::ui32MAX - x; // Adding to the first digit and taking a loan
+        td->value++;
+        for(td = td->next; td != NULL && td->value == 0; td = td->next) {
+            // If the next digit is zero, we'll need to take the loan from the next digit to that one
+            td->value = BigInteger::ui32MAX;
+        }
+        if(td != NULL) {
+            --td->value;
+            if(td == this->last && td->value == 0) this->pop();
+        } else {/*Exception here: The most significant digit can't be zero*/}
+    } else {
+        td->value -= x;
+    }
+}
+
+BigInteger& BigInteger::operator += (int v) {
+    if(v >= 0) {
+        if(this->Positive == true) this->plusEqualPositive((ui32)v);
+        else this->minusEqualPositive((ui32) v);// Using the fact -a + v == -(a - v)
+    } else {
+        v = -v;
+        if(this->Positive == true) this->minusEqualPositive((ui32)v);
+        else this->plusEqualPositive((ui32)v);        // Using the fact -a - v == -(a + v)
+    }
+    return *this;
 }
 
 void BigInteger::printHex() const {
@@ -657,6 +797,22 @@ void BigInteger::setAsZero() {
     this->~BigInteger();
     this->first = new Digit(0);
     this->last = this->first;
+    this->Positive = true;
+}
+
+void BigInteger::setAsOne() {
+    this->~BigInteger();
+    this->first = new Digit(1);
+    this->last = this->first;
+    this->Positive = true;
+}
+
+void BigInteger::setAs(int x) {
+    this->~BigInteger();
+    if(x < 0) { this->Positive = false; x = -x;}
+    else this->Positive = true;
+    this->first = new Digit((ui32)x);
+    this->last = this->first;
 }
 
 void BigInteger::append(ui32 x) {
@@ -670,7 +826,7 @@ void BigInteger::append(ui32 x) {
 }
 
 ui32 BigInteger::pop() {
-    if(this->first == NULL) return 0;   //- This should be handle by an exception.
+    if(this->first == NULL) return 0; //- This should be handle by an exception.
     ui64 r = this->last->value;
     if(this->first->next == NULL) {
         if(r != this->first->value) {/*Some exception here*/}

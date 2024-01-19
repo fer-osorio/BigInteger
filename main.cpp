@@ -25,6 +25,7 @@ int main(void)
     // -Using BigInteger(const char[], NumberBase = HEXADECIMAL) implicitly.
     BigInteger n0="FFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF";
     BigInteger n1="-FFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF""FFFFFFFFFFFFFFFF";
+    BigInteger quorem[2];
     //BigInteger n2 = 2;
     //BigInteger n3 = "FFFF";
 
@@ -51,6 +52,10 @@ int main(void)
     // (2^w - 1)^2 = 2^{2*w} - 2^{w+1} + 1
     std::cout << "n0*(-n1+1) =  "; (n0*(-n1+1)).printHexln();
     std::cout << "n0*n1      = "; (n0*n1).printHexln(); std::cout << '\n';
+
+    shortDivision(n0, 0x10000, quorem);
+    std::cout << "n0 / 2^16 = " ; quorem[0].printHexln();
+    std::cout << "n0 % 2^16 = " ; quorem[1].printHexln();
 
     return 0;
 }

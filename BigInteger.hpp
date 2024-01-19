@@ -71,9 +71,13 @@ struct BigInteger {
 	friend BigInteger operator - (const BigInteger&, const BigInteger&);
 	friend BigInteger operator * (const BigInteger&, const BigInteger&);
 	BigInteger operator - ();
+	BigInteger& operator ++ ();
+	BigInteger& operator -- ();
+	BigInteger& operator += (int);
 
 	// Comparison
 	bool operator == (int) const;
+	bool operator != (int) const;
 
 	friend std::ostream& operator << (std::ostream&, BigInteger);
 
@@ -81,40 +85,46 @@ struct BigInteger {
 	void printHexln() const;
 
 	private:
-	void setAsZero();
-	void append(ui32);
-	void push(ui32);
-	ui32 pop(void);
-	bool isValidDigit(char, NumberBase);
+	void setAsZero();	// Calls the destructor and sets this BigInteger to zero
+	void setAsOne();	// Calls the destructor and sets this BigInteger to one
+	void setAs(int x);	// Calls the destructor and sets this BigInteger to x
+	void append(ui32);	// In the list of digits, puts a new element at the end
+	void push(ui32);	// In the list of digits, puts a new element at the beginning
+	ui32 pop(void);		// In the list of digits, returns the value of the last element and deletes it
+	bool isValidDigit(char, NumberBase);// Given a number base...
+	void plusEqualPositive(ui32 x); 	// Adds x to this BigInteger. Assuming this BigInteger is positive.
+	void minusEqualPositive(ui32 x); 	// Subtracts x from this BigInteger. Assuming this BigInteger is positive.
 
 	// -Addition of non-negative integers. This function will assume both
 	//  arguments are positive. The 'Positive' attribute of the result is
 	//	never touched.
 	// -The result of the addition will be saved in the variable 'result'.
 	//  This is made in this way in order to avoid the copy of objects.
-	friend BigInteger& additionPositive(const BigInteger& a,
-										const BigInteger& b,
-										BigInteger& result);
+	friend BigInteger& additionPositive(const BigInteger& a, const BigInteger& b, BigInteger& result);
+
 	// -Subtraction of non-negative integers. This function will assume both
 	//  arguments are positive.
 	// -The result of the subtraction will be saved in the variable 'result'.
 	//  This is made in this way in order to avoid the copy of objects.
-	friend BigInteger& subtractionPositive(const BigInteger& a,
-										   const BigInteger& b,
-										   BigInteger& result);
+	friend BigInteger& subtractionPositive(const BigInteger& a, const BigInteger& b, BigInteger& result);
+
 	// -Computes the quotient divisor/dividend and the remainder
 	//	divisor%dividend, where the divided is a single precision number. The
 	//  result is saved in the 'result' array in the form [divisor/dividend,
 	//	divisor%dividend].
-	friend void shortDivision(const BigInteger&  divisor,
-							  const ui64 dividend,
-							  BigInteger result[2]);
+	// -This function assumes its arguments are positive.
+	friend void shortDivisionPositive(const BigInteger& dividend, const ui32 divisor, BigInteger result[2]);
+
+	// -Same as shortDivisionPositive, but know we take in account the sign of the first argument
+	friend void shortDivision(const BigInteger& dividend, ui32 divisor, BigInteger result[2]);
+
+	// -Same as shortDivisionPositive, but know we take in account the sign.
+	friend void shortDivision(const BigInteger& dividend, int divisor, BigInteger result[2]);
+
 	// -Computes the quotient divisor/dividend and the remainder
 	//	divisor%dividend. The result is saved in the 'result' array
 	//	in the form [divisor/dividend, divisor%dividend].
-	friend void quotientRemainder(const BigInteger&  divisor,
-								  const BigInteger& dividend,
-								  BigInteger result[2]);
+	friend void quotientRemainder(const BigInteger& dividend, const BigInteger& divisor, BigInteger result[2]);
 };
 void ui64Product(ui64, ui64, ui64[2]);
 #endif
