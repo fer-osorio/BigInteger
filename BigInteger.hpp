@@ -50,6 +50,15 @@ struct BigInteger {
 
 	public:
 	inline BigInteger(): first(new Digit()), last(first), Positive(true) {}; // -Initialize as zero.
+	inline ~BigInteger() {
+		struct Digit* t;
+		for(t = this->first; t != NULL; t = this->first) {
+			this->first = this->first->next;
+			delete t;
+		}
+		this->last = NULL;
+		//printf("this->firts == %lX\n", (ui64)this->first);
+	}
 	BigInteger(i64);
 	BigInteger(const BigInteger&);
 	BigInteger(Digit*, bool); 					// Initializing with a list of digits and sing.
@@ -60,8 +69,6 @@ struct BigInteger {
 	// -Just valid characters are read.
 
 	BigInteger(const ui32[], unsigned, bool = true);	// Initializing with a ui32 array. Little endianess is used.
-
-	~BigInteger();
 
 	// Assignment
 	BigInteger& operator = (const BigInteger&);

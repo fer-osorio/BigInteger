@@ -1,20 +1,20 @@
 #include"BigInteger.hpp"
 
 BigInteger::BigInteger(i64 number) {
-    ui64Toui32 tmp; tmp.ui64int = 0;
-    if(number < 0) {
+    ui64Toui32 tmp; tmp.ui64int = 0;                // We'll divide 'number' in its upper 32 bits and lower 32 bits
+    if(number < 0) {                                // Saving sign and changing to positive if necessary
         Positive = false;
         number = -number;
     } else
         Positive = true;
-    if(number > (i64)ui32MAX) { // In this case, we'll need two of our 'digits' to store the number.
+    if(number > (i64)ui32MAX) {                     // In this case, we'll need two Digit objects to store the number.
         tmp.ui64int = (ui64)number;
-        this->first = new Digit(tmp.uint[0]);
-        this->first->next = new Digit(tmp.uint[1]);
+        this->first = new Digit(tmp.uint[0]);        // Saving lower 32 bits
+        this->first->next = new Digit(tmp.uint[1]);  // Saving upper 32 bits
         this->last = this->first->next;
         return;
     }
-    this->first = new Digit((ui64)number);
+    this->first = new Digit((ui32)number);
     this->last = this->first;
 }
 
@@ -179,16 +179,6 @@ BigInteger::BigInteger(const char bytes[], ui64 size, bool positive)
         for(j = 0; j < r ; j++) buffer.uchar[j] = (ui08)bytes[i+j];
         this->append(buffer.ui32int);
     }
-}
-
-BigInteger::~BigInteger() {
-    Digit* aux;
-    while(this->first != NULL) {
-        aux = this->first;
-        this->first = this->first->next;
-        delete aux;
-    }
-    this->first = this->last = NULL;
 }
 
 BigInteger& BigInteger::operator = (const BigInteger& a) {
@@ -574,26 +564,25 @@ BigInteger operator * (const BigInteger& a, const BigInteger& b) {
 }
 
 void shortDivisionPositive(const BigInteger& dividend, const ui32 divisor, BigInteger result[2]) {
-	if(result[0].first != NULL) result[0].~BigInteger(); // -Before start, we "destroy" what is inside the 'result' array.
-	if(result[1].first != NULL) result[1].~BigInteger();
-	if(dividend == 0) {/*Exception here*/}
-	if(divisor  == 0) {/*Some code here*/}
+	if(result[0].first != NULL) {result[0].~BigInteger();printf("\nresult[0].first = %lX, result[0].last = %lX\n", (ui64)result[0].last, (ui64)result[0].first);}                     // -Before start, we "destroy" what is inside the 'result' array.
+	if(result[1].first != NULL) {result[1].~BigInteger();printf("\nresult[1].first = %lX, result[1].last = %lX\n", (ui64)result[1].last, (ui64)result[1].first);}
+	if(divisor  == 0) {/*Exception here*/}
+	if(dividend == 0) {/*Some code here*/}
 
 	BigInteger::Digit* nonce = NULL, *pd;
-	BigInteger tmp(nonce, true); // BigInteger with empty (NULL) digits list.
-
-	for(pd = dividend.first ; pd != NULL; pd = pd->next) { // Inverting the order of the digits.
+	BigInteger tmp(nonce, true);                                            // BigInteger with empty (NULL) digits list.
+	for(pd = dividend.first ; pd != NULL; pd = pd->next) {                   // Inverting the order of the digits.
 	    tmp.push(pd->value);
 	}
 	ui64 r = 0;
 	ui64Toui32 t;
-	result[0] = BigInteger(nonce, true);
 	for(pd = tmp.first; pd != NULL; pd = pd->next) {
-        t.uint[1] = r; t.uint[0] = pd->value; // t = r*2^32 + pd->value
-        result[0].push(t.ui64int/divisor);
-        r = t.ui64int % divisor;
+        t.uint[1] = r; t.uint[0] = pd->value;                               // t = r*2^32 + pd->value
+        result[0].push((ui32)(t.ui64int/(ui64)divisor));
+        r = t.ui64int % (ui64)divisor;
 	}
-	while(result[0].last->value == 0 && result[0].first != result[0].last) result[0].pop(); // Deleting left zeros (unless quotient == 0)
+	while(result[0].last->value == 0 && result[0].first != result[0].last)   // Deleting left zeros (unless quotient == 0)
+	    result[0].pop();
 	result[1] = BigInteger((i64)r);
 }
 
@@ -639,7 +628,6 @@ void shortDivision(const BigInteger& dividend, int divisor, BigInteger result[2]
     }
     if(dividend.Positive == true && !divisorPositive) {                 // Numerator is positive and denominator is negative.
         result[0].Positive = false;                                     // a/-b = -(a/b) & a%-b = a%b
-        return;
     }
 }
 
@@ -749,26 +737,33 @@ BigInteger& BigInteger::operator += (int v) {
 }
 
 void BigInteger::printHex() const {
-    if(this->first == NULL) return ;
-    Digit* r = this->first;    // -Runs trough the digits.
-    ui32Toui08 buffer;
+    if(this->first == NULL) {
+        std::cout << "\nList of digits is a NULL pointer...\n";
+        /*Some exception here.*/
+        return;
+    }
+    Digit* r = this->first;                                  // Runs trough the digits.
+    ui32Toui08 buffer;                                       // We'll print byte per byte
 
     i64 length = 1, i = 0;
-    while((r = r->next) != NULL) length++; // -Length of the number.
-
-    if(!this->Positive) printf("-");
-    r = this->first;
-
-    while(++i < length) {r = r->next;} // Reaching end of digits list
-    buffer.ui32int = r->value;          // From ui64 to ui08[8]
-
-    // Printing first list element
-    for(i = 3; i > 0 && buffer.uchar[i] == 0; i--) {} // Ignoring left zeros
-    if(i == 0) { // In case of having 3 zero bytes
+    if(r->next != NULL) {                                   // In case of having more than one Digit object in the list
+        for(length=2,r=r->next; r->next!=NULL; r=r->next)   // At least we have two Digits. Calculating total length
+            length++;
+    }                                                       // At this point 'r' should point to the last element.
+    if(r != this->last) {
+        std::cout << "\nException in file BigInteger.cpp, inside function void BigInteger::printHex() const. Last element of the Digit list don't "
+                              "coincide with the object pointed by 'this->last'.\n";
+        printf("\n[r,this->last] = [%lX, %lX]\n", (ui64)r, (ui64)this->last);
+        printf("\nr->value == %X and this->last->value == %X\n", r->value, this->last->value);
+    }
+    if(!this->Positive) printf("-");                        // Negative number
+    buffer.ui32int = r->value;                               // From ui32 to ui08[4]
+    for(i = 3; i > 0 && buffer.uchar[i] == 0; i--) {}        // Printing first list element. Ignoring left zeros
+    if(i == 0) {                                            // In case of having 3 zero bytes
         printf("%X",buffer.uchar[i]);
     } else {
         printf("%X",buffer.uchar[i]);
-        for(i--; i >= 0; i--) { // Printing non-zero bytes
+        for(i--; i >= 0; i--) {                             // Printing non-zero bytes
             if(buffer.uchar[i] < 10) printf("0");
             printf("%X",buffer.uchar[i]);
         }
@@ -777,11 +772,10 @@ void BigInteger::printHex() const {
 
     while(0 < length--) {
         printf(",");
-        r = this->first; i = 0;
-        // -Getting to the last unread digit.
+        r = this->first; i = 0;                              // -Getting to the last unread digit.
         while(i++ < length) {r = r->next;}
         buffer.ui32int = r->value;
-        for(i = 3; i >= 0; i--) { // Printing non-zero bytes
+        for(i = 3; i >= 0; i--) {                           // Printing non-zero bytes
             if(buffer.uchar[i] < 10) printf("0");
             printf("%X",buffer.uchar[i]);
         }
@@ -826,25 +820,27 @@ void BigInteger::append(ui32 x) {
 }
 
 ui32 BigInteger::pop() {
-    if(this->first == NULL) return 0; //- This should be handle by an exception.
-    ui64 r = this->last->value;
-    if(this->first->next == NULL) {
-        if(r != this->first->value) {/*Some exception here*/}
+    if(this->first == NULL) return 0;       // NULL list, this should be handle by an exception.
+    ui64 r = this->last->value;            // Saving last value
+    if(this->first->next == NULL) {         // Single precision number
+        if(r != this->first->value)
+            {/*Some exception here*/}
         delete this->first;
-        this->first = this->last = NULL;
+        this->first = this->last = NULL;    // Empty digits list, maybe this should throw an exception
         return r;
     }
-    Digit* aux = this->first;
-    while(aux->next->next != NULL) aux = aux->next;
-    delete this->last;
+    Digit* aux;
+    for(aux = this->first; aux->next->next != NULL; aux = aux->next) {} // Reaching the element before the last Digit object
+    delete this->last;                     // Updating last attribute
     this->last = aux;
     this->last->next = NULL;
     return r;
 }
 
-void BigInteger::push(ui32 x) {
-    Digit* _digits = new Digit(x);
-    _digits->next = this->first;
-    this->first = _digits;
+void BigInteger::push(ui32 x) {            // New element at the beginning of the Digits list
+    Digit* _first = new Digit(x);
+    if(this->last == NULL) this->last = _first;                    // Guarding against BigInteger initialized with NULL pointer.)
+    _first->next = this->first;
+    this->first = _first;
 }
 
