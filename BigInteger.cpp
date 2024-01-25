@@ -3,25 +3,18 @@
 BigInteger::BigInteger(i64 number) {
     ui64Toui32 tmp; tmp.ui64int = 0;                // We'll divide 'number' in its upper 32 bits and lower 32 bits
     if(number < 0) {                                // Saving sign and changing to positive if necessary
-        Positive = false;
+        this->Positive = false;
         number = -number;
     } else
-        Positive = true;
+        this->Positive = true;
     if(number > (i64)ui32MAX) {                     // In this case, we'll need two Digit objects to store the number.
         tmp.ui64int = (ui64)number;
         this->first = new Digit(tmp.uint[0]);        // Saving lower 32 bits
         this->first->next = new Digit(tmp.uint[1]);  // Saving upper 32 bits
         this->last = this->first->next;
-        return;
-    }
-    this->first = new Digit((ui32)number);
-    this->last = this->first;
-}
-
-BigInteger::BigInteger(Digit* d, bool pos) : Positive(pos) {
-    while(d != NULL) {
-        this->append(d->value);
-        d = d->next;
+    } else {
+        this->first = new Digit((ui32)number);
+        this->last = this->first;
     }
 }
 
@@ -183,7 +176,7 @@ BigInteger::BigInteger(const char bytes[], ui64 size, bool positive)
 
 BigInteger& BigInteger::operator = (const BigInteger& a) {
     if(this != &a) { // Guarding against self assignment.
-        this->~BigInteger();
+        this->clean();
         this->Positive = a.Positive;
         Digit *aux = a.first;
         while(aux != NULL) {
@@ -230,37 +223,31 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
 //    carriage_{i} = 0.
 // ---------------------------------------------------------------------------
 
-BigInteger& additionPositive(const BigInteger& a, const BigInteger& b,
-							 BigInteger& result) {
-	if(result.first != NULL) {
-	    result.~BigInteger();
+void BigInteger::addNonnegative(const BigInteger& x, BigInteger& result) const {
+	if(result.first != NULL) result.clean();                                     // "Cleaning" the container of the result
+	if(this->first == NULL || x.first == NULL) {
+	    throw "\nBigInteger.cpp, in function void BigInteger::addNonnegative"
+	    "(const BigInteger& x, BigInteger& result); either this->first == NULL "
+	    "or x.first == NULL\n";
 	}
-	if(a.first == NULL || b.first == NULL) return result;   // Exception here
-	if(a == 0) {    // 0 + b = 0
-	    result = b;
-	    return result;
-	}
-	if(b == 0) {    // a + 0 = a
-	    result = a;
-	    return result;
-	}
+	if(*this == 0) { result = x; return; }                                      // 0 + b = 0
+	if(x == 0) { result = *this; return; }                                      // a + 0 = a
     ui64Toui32 tmp;
     ui64 carriage = 0;
 
-    BigInteger::Digit *da = a.first, *db = b.first, *largest = NULL;
-    while(da != NULL && db != NULL) {
-        tmp.ui64int = (ui64)da->value + (ui64)db->value + carriage;
+    BigInteger::Digit *dt = this->first, *dx = x.first, *largest = NULL;
+    while(dt != NULL && dx != NULL) {
+        tmp.ui64int = (ui64)dt->value + (ui64)dx->value + carriage;
         result.append(tmp.uint[0]);
         carriage = tmp.uint[1];
-        da = da->next;
-        db = db->next;
+        dt = dt->next;
+        dx = dx->next;
     }
-    // -In case of having to numbers of different amount of digits.
-    if(da != NULL) largest = da;
-    else largest = db;
+    if(dt != NULL) largest = dt;                                                // In case of having to numbers of different amount of digits.
+    else largest = dx;
     while(largest != NULL) {
         if((carriage == 1) && (largest->value == BigInteger::ui32MAX))
-            result.append(0); // Preserve carriage as 1.
+            result.append(0);                                                   // Preserve carriage as 1.
         else {
             result.append(largest->value + carriage);
             carriage = 0;
@@ -268,29 +255,26 @@ BigInteger& additionPositive(const BigInteger& a, const BigInteger& b,
         largest = largest->next;
     }
     if(carriage == 1) result.append(1);
-    return result;
+    return;
 }
 
 BigInteger operator + (const BigInteger& a, const BigInteger& b) {
-    BigInteger::Digit* nonce = NULL;
-    BigInteger r(nonce, true);
-
-    // Case 1: Operands are negative.
-    if(a.Positive == false && b.Positive == false) {
-        additionPositive(a, b, r);
+    BigInteger r(true,0);
+    if(a.Positive == false && b.Positive == false) {                            // Case 1: Operands are negative.
+        a.addNonnegative(b, r);                                                 // -a + (-b) = -(a + b)
         r.Positive = false;
         return r;
     }
-    // Case 2: First positive, second negative.
-    if(a.Positive == true && b.Positive == false) {
-        return subtractionPositive(a, b, r);
+    if(a.Positive == true && b.Positive == false) {                             // Case 2: First positive, second negative.
+        a.subtractNonnegative(b, r);                                            // a + (-b) = a - b
+        return r;
     }
-    // Case 2: First negative, second positive.
-    if(a.Positive == false && b.Positive == true) {
-        return subtractionPositive(b, a, r);;
+    if(a.Positive == false && b.Positive == true) {                             // Case 2: First negative, second positive.
+        b.subtractNonnegative(a,r);                                             // -a + b = b - a
+        return r;
     }
-    // Case 4: Operands are positive.
-    return additionPositive(a, b, r);
+    a.addNonnegative(b, r);                                                     // Case 4: Operands are positive.
+    return r;
 }
 
 // |||| Algorithm for the subtraction of two positive numbers in base k ||||||
@@ -309,25 +293,20 @@ BigInteger operator + (const BigInteger& a, const BigInteger& b) {
 //  3) For i\in{m+1,..,n} : r_{i} = a_{i} - loan_{i-1}; if r_{i} < 0,
 //     r_{i} += k and set loan_{i} = 1, in other case set loan_{i} = 0.
 
-BigInteger& subtractionPositive(const BigInteger& a,const BigInteger& b,BigInteger& result) {
-    if(result.first != NULL) {
-	    result.~BigInteger();
-	    result.first = result.last = NULL;
+void BigInteger::subtractNonnegative(const BigInteger &x, BigInteger &result)
+const {
+    if(result.first != NULL) result.clean();
+	if(this->first == NULL || x.first == NULL) {
+	    throw "\nBigInteger.cpp, in function void BigInteger::addNonnegative"
+	    "(const BigInteger& x, BigInteger& result); either this->first == NULL "
+	    "or x.first == NULL\n";
 	}
-	if(a.first == NULL || b.first == NULL) return result; // Exception here
-	if(a == 0) {    // 0 - b = 0
-	    result = b;
-	    result.Positive = !result.Positive;
-	    return result;
-	}
-	if(b == 0) {    // a - 0 = a
-	    result = a;
-	    return result;
-	}
+	if(*this == 0) { result = x; result.Positive = !result.Positive; return; }  // 0 - b = 0
+	if(x == 0) { result = *this; return; }                                      // a - 0 = a
 
 	ui64 load = 0;
 	bool aIsBigger = false;
-	BigInteger::Digit *d0 = a.first, *d1 = b.first;
+	BigInteger::Digit *d0 = this->first, *d1 = x.first;
 
 	while(d0 != NULL && d1 != NULL) { // Determining the biggest number.
         if(d0->value >= d1->value) aIsBigger = true;
@@ -338,12 +317,12 @@ BigInteger& subtractionPositive(const BigInteger& a,const BigInteger& b,BigInteg
 	if(d0 != NULL && d0->value != 0) aIsBigger = true;
 	if(aIsBigger) {
 	    result.Positive = true;
-	    d0 = a.first;
-	    d1 = b.first;
+	    d0 = this->first;
+	    d1 = x.first;
 	} else {
 	    result.Positive = false;
-	    d0 = b.first;
-	    d1 = a.first;
+	    d0 = x.first;
+	    d1 = this->first;
 	}
     while(d0 != NULL && d1 != NULL) {
         if((d0->value < d1->value) || (d0->value == d1->value && load == 1)) {
@@ -374,34 +353,28 @@ BigInteger& subtractionPositive(const BigInteger& a,const BigInteger& b,BigInteg
         }
         if(d0->value > 1 || load == 0) result.append(d0->value - load);
     }
-    // -Erasing the leftmost zeros till find a nonzero element or till
-    //  we have just one element in the list.
-    while(result.last != result.first && result.last->value == 0)
+    while(result.last != result.first && result.last->value == 0)                // -Erasing the leftmost zeros.
           result.pop();
-
-    return result;
+    return;
 }
 
 BigInteger operator - (const BigInteger& a, const BigInteger& b) {
-    BigInteger::Digit* nonce = NULL;
-    BigInteger r(nonce, true);
+    BigInteger r(true,0);                                                       // BigInteger object with empty list of digits
 
-    // Case 1: Operands are negative.
-    if(a.Positive == false && b.Positive == false) {
-        return subtractionPositive(b, a, r);
-    }
-    // Case 2: First positive, second negative.
-    if(a.Positive == true && b.Positive == false) {
-        return additionPositive(a, b, r);
-    }
-    // Case 3: First negative, second positive.
-    if(a.Positive == false && b.Positive == true) {
-        additionPositive(a, b, r);
-        r.Positive = false;
+    if(a.Positive == false && b.Positive == false) {                            // Case 1: Operands are negative.
+        b.subtractNonnegative(a, r);                                            // -a - (-b) = -a + b = b - a
         return r;
     }
-    // Case 4: Operands are positive.
-    return subtractionPositive(a, b, r);
+    if(a.Positive == true && b.Positive == false) {                             // Case 2: First positive, second negative.
+        a.addNonnegative(b, r);                                                 // a - (-b) = a + b
+        return r;
+    }
+    if(a.Positive == false && b.Positive == true) {                             // Case 3: First negative, second positive.
+        a.addNonnegative(b, r); r.Positive = false;                             // -a - b = -(a + b)
+        return r;
+    }
+    a.subtractNonnegative(b, r);                                                // Case 4: Operands are positive.
+    return r;
 }
 
 // ||||||||||||||| Multiplication of integers of 64 bits |||||||||||||||||||||
@@ -506,8 +479,8 @@ void ui64Product(ui64 a, ui64 b, ui64 result[2]) {
 //  taken from Knut's book "The art of computer programming: Volume 2".
 
 BigInteger operator * (const BigInteger& a, const BigInteger& b) {
-    BigInteger::Digit *nonce = NULL, *ad = a.first, *bd = b.first;
-    BigInteger r(nonce, true); // Initializing with NULL list of digits.
+    BigInteger::Digit *ad = a.first, *bd = b.first;
+    BigInteger r(true,0); // Initializing with NULL list of digits.
     r.Positive = (a.Positive && b.Positive) || !(a.Positive || b.Positive);
 
     if(a.first == NULL || b.first == NULL) {return r;}  // exception here
@@ -564,13 +537,13 @@ BigInteger operator * (const BigInteger& a, const BigInteger& b) {
 }
 
 void shortDivisionPositive(const BigInteger& dividend, const ui32 divisor, BigInteger result[2]) {
-	if(result[0].first != NULL) {result[0].~BigInteger();printf("\nresult[0].first = %lX, result[0].last = %lX\n", (ui64)result[0].last, (ui64)result[0].first);}                     // -Before start, we "destroy" what is inside the 'result' array.
-	if(result[1].first != NULL) {result[1].~BigInteger();printf("\nresult[1].first = %lX, result[1].last = %lX\n", (ui64)result[1].last, (ui64)result[1].first);}
+	if(result[0].first != NULL) {result[0].clean();printf("\nresult[0].first = %lX, result[0].last = %lX\n", (ui64)result[0].last, (ui64)result[0].first);}                     // -Before start, we "destroy" what is inside the 'result' array.
+	if(result[1].first != NULL) {result[1].clean();printf("\nresult[1].first = %lX, result[1].last = %lX\n", (ui64)result[1].last, (ui64)result[1].first);}
 	if(divisor  == 0) {/*Exception here*/}
 	if(dividend == 0) {/*Some code here*/}
 
-	BigInteger::Digit* nonce = NULL, *pd;
-	BigInteger tmp(nonce, true);                                            // BigInteger with empty (NULL) digits list.
+	BigInteger::Digit* pd;
+	BigInteger tmp(true,0);                                            // BigInteger with empty (NULL) digits list.
 	for(pd = dividend.first ; pd != NULL; pd = pd->next) {                   // Inverting the order of the digits.
 	    tmp.push(pd->value);
 	}
@@ -788,21 +761,21 @@ void BigInteger::printHexln() const {
 }
 
 void BigInteger::setAsZero() {
-    this->~BigInteger();
+    this->clean();
     this->first = new Digit(0);
     this->last = this->first;
     this->Positive = true;
 }
 
 void BigInteger::setAsOne() {
-    this->~BigInteger();
+    this->clean();
     this->first = new Digit(1);
     this->last = this->first;
     this->Positive = true;
 }
 
 void BigInteger::setAs(int x) {
-    this->~BigInteger();
+    this->clean();
     if(x < 0) { this->Positive = false; x = -x;}
     else this->Positive = true;
     this->first = new Digit((ui32)x);
