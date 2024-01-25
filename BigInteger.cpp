@@ -175,8 +175,8 @@ BigInteger::BigInteger(const char bytes[], ui64 size, bool positive)
 }
 
 BigInteger& BigInteger::operator = (const BigInteger& a) {
-    if(this != &a) { // Guarding against self assignment.
-        this->clean();
+    if(this != &a) {                                                            // Guarding against self assignment.
+        this->clean();                                                          // Releasing memory
         this->Positive = a.Positive;
         Digit *aux = a.first;
         while(aux != NULL) {
@@ -184,6 +184,17 @@ BigInteger& BigInteger::operator = (const BigInteger& a) {
             aux = aux->next;
         }
     }
+    return *this;
+}
+
+BigInteger& BigInteger::operator = (int t) {
+    this->clean();                                                              // Releasing memory
+    if(t >= 0) this->Positive =  true;                                          // Determining sign
+    else {
+        this->Positive = false;                                                 // Saving negative sign and making 't' positive
+        t = -t;
+    }
+    this->last = this->first = new Digit((ui32)t);                               // Digit list with a unique element
     return *this;
 }
 
@@ -536,71 +547,74 @@ BigInteger operator * (const BigInteger& a, const BigInteger& b) {
     return r;
 }
 
-void shortDivisionPositive(const BigInteger& dividend, const ui32 divisor, BigInteger result[2]) {
-	if(result[0].first != NULL) {result[0].clean();printf("\nresult[0].first = %lX, result[0].last = %lX\n", (ui64)result[0].last, (ui64)result[0].first);}                     // -Before start, we "destroy" what is inside the 'result' array.
-	if(result[1].first != NULL) {result[1].clean();printf("\nresult[1].first = %lX, result[1].last = %lX\n", (ui64)result[1].last, (ui64)result[1].first);}
-	if(divisor  == 0) {/*Exception here*/}
-	if(dividend == 0) {/*Some code here*/}
+void BigInteger::shortDivisionNonnegative(ui32 divisor, BigInteger result[2])
+const{
+	if(result[0].first != NULL) result[0].clean();                               // -Before start, we "clean" what is inside the 'result' array.
+	if(result[1].first != NULL) result[1].clean();
+	if(divisor  == 0) {
+	    throw "Exception in BigInteger.cpp, function void shortDivisionNonnegat"
+        "ive(const BigInteger& dividend, const ui32 divisor,BigInteger result[2"
+        "]): Division by zero not defined.";
+	}
+	if(*this == 0) { result[0] = 0; result[1] = 0; return; }                 // 0 = 0·divisor + 0
 
 	BigInteger::Digit* pd;
-	BigInteger tmp(true,0);                                            // BigInteger with empty (NULL) digits list.
-	for(pd = dividend.first ; pd != NULL; pd = pd->next) {                   // Inverting the order of the digits.
+	BigInteger tmp(true,0);                                                     // BigInteger with empty (NULL) digits list.
+	for(pd = this->first ; pd != NULL; pd = pd->next) {                       // Inverting the order of the digits.
 	    tmp.push(pd->value);
 	}
-	ui64 r = 0;
-	ui64Toui32 t;
+	ui64 r = 0;                                                                 // We'll save the remainder here
+	ui64Toui32 t;                                                               // Intended for the 'cast' of a 64-bits integer to an array of two 32-bits integer
 	for(pd = tmp.first; pd != NULL; pd = pd->next) {
-        t.uint[1] = r; t.uint[0] = pd->value;                               // t = r*2^32 + pd->value
+        t.uint[1] = r; t.uint[0] = pd->value;                                   // t.ui64int = r*2^32 + pd->value
         result[0].push((ui32)(t.ui64int/(ui64)divisor));
         r = t.ui64int % (ui64)divisor;
 	}
-	while(result[0].last->value == 0 && result[0].first != result[0].last)   // Deleting left zeros (unless quotient == 0)
+	while(result[0].last->value == 0 && result[0].first != result[0].last)       // Deleting left zeros (unless quotient == 0)
 	    result[0].pop();
 	result[1] = BigInteger((i64)r);
 }
 
 //  Quotient remainder sign
 
-// -Let a,b be integers, a,b != 0. From euclidean division theorem a = q[a]·b + r where 0 <= r < |b|. Let a,b be positive and supose r > 0.
+// -Let a,b be integers, a,b != 0. From euclidean division theorem a = q[a]·b + r where 0 <= r < |b|. Let a,b be positive and suppose r > 0.
 // -First  case: -a = (-q[a])·b - r = (-q[a])·b - b + b - r = (-(q[a]+1))·b + (b-r); Since 0 < r < b, then 0 < b-r < b implying -a/b = -(a/b+1) y -a%b = b - a%b.
 // -Second case:  a = q[a]·b + r = q[a]·-(-b) + r = (-q[a])·(-b) + r, therefore a/-b = -(a/b) & a%-b = a%b
-// -Third  case: -a = -(q[a]·b + r) = q[a]·(-b) - r = (q[a]+1)·(-b) + (b-r); reasoning similarly to the first case .we have -a/-b = (a/b)+1 and -a%-b = b - a%b.
+// -Third  case: -a = -(q[a]·b + r)  = q[a]·(-b) - r = (q[a]+1)·(-b) + (b-r); reasoning similarly to the first case .we have -a/-b = (a/b)+1 and -a%-b = b - a%b.
 
-void shortDivision(const BigInteger& dividend, ui32 divisor, BigInteger result[2]) {
+void BigInteger::shortDivision(ui32 divisor, BigInteger result[2]) const{
     if(divisor == 0) { /*Exception here*/ return;}
-
-    shortDivisionPositive(dividend, (ui32)divisor, result); // Computing the [quotient,reminder] as if the arguments were both positive
-    if(dividend.Positive == false) {                        // Numerator is negative
-        if(result[1] != 0) {                                // The remainder is not zero, then...
-            ++result[0];                                    // Using -a/b = -(a/b + 1)
-            result[1].Positive = false;                     // Using -a%b = b - a%b.
+    this->shortDivisionNonnegative(divisor, result);                            // Computing the [quotient,reminder] as if the arguments were both positive
+    if(this->Positive == false) {                                               // Dividend is negative
+        if(result[1] != 0) {                                                    // The remainder is not zero, then...
+            ++result[0];                                                        // Using -a/b = -(a/b + 1)
+            result[1].Positive = false;                                         // Using -a%b = b - a%b.
             result[1].plusEqualPositive(divisor);
         }
-        if(result[0] != 0) result[0].Positive = false;      // Changing sign of quotient if and only if the quotient is not zero.
+        if(result[0] != 0) result[0].Positive = false;                          // Changing sign of quotient if and only if the quotient is not zero.
     }
 }
 
-void shortDivision(const BigInteger& dividend, int divisor, BigInteger result[2]) {
+void BigInteger::shortDivision(int divisor, BigInteger result[2]) const{
     if(divisor == 0) { /*Exception here*/ return;}
-
     bool divisorPositive;
-    if(divisor > 0) divisorPositive = true;                             // Saving the sign and changing to positive if necessary
+    if(divisor > 0) divisorPositive = true;                                     // Saving the sign and changing to positive if necessary
     else {
         divisorPositive = false;
         divisor = -divisor;
     }
-    shortDivisionPositive(dividend, (ui32)divisor, result);             // Computing the [quotient,reminder] as if the arguments were both positive
-    if(dividend.Positive == false) {                                    // Numerator is negative
-        if(result[1] != 0) {                                            // The remainder is not zero, then...
-            ++result[0];                                                // Using -a/b = -(a/b + 1) and -a/-b = (a/b) + 1
-            result[1].Positive = false;                                 // Using -a%b = b - a%b and -a%-b = b - a%b.
+    this->shortDivisionNonnegative((ui32)divisor, result);                      // Computing the [quotient,reminder] as if the arguments were both positive
+    if(this->Positive == false) {                                               // Numerator is negative
+        if(result[1] != 0) {                                                    // The remainder is not zero, then...
+            ++result[0];                                                        // Using -a/b = -(a/b + 1) and -a/-b = (a/b) + 1
+            result[1].Positive = false;                                         // Using -a%b = b - a%b and -a%-b = b - a%b.
             result[1] += divisor;
         }
-        if(divisorPositive && result[0]!=0) result[0].Positive = false; // Changing sign of quotient if and only if divisor is positive and quotient is not zero.
-        return;
+        if(divisorPositive && result[0]!=0) result[0].Positive = false;         // Changing sign of quotient if and only if divisor is positive and quotient is not
+        return;                                                                 // zero.
     }
-    if(dividend.Positive == true && !divisorPositive) {                 // Numerator is positive and denominator is negative.
-        result[0].Positive = false;                                     // a/-b = -(a/b) & a%-b = a%b
+    if(this->Positive && !divisorPositive) {                                    // Dividend is positive and divisor is negative.
+        result[0].Positive = false;                                             // a/-b = -(a/b) & a%-b = a%b
     }
 }
 

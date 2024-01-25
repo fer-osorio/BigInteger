@@ -53,7 +53,7 @@ int main(void)
     std::cout << "n0*(-n1+1) =  "; (n0*(-n1+1)).printHexln();
     std::cout << "n0*n1      = "; (n0*n1).printHexln(); std::cout << '\n';
 
-    shortDivisionPositive(n0, 0x10000, quorem);
+    n0.shortDivision(0x10000, quorem);
     std::cout << "n0 / 2^16 = " ; quorem[0].printHexln();
     std::cout << "n0 % 2^16 = " ; quorem[1].printHexln();
 

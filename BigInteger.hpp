@@ -48,7 +48,7 @@ struct BigInteger {
 	static const ui64 ui64MAX = 0xFFFFFFFFFFFFFFFF;								// 64 bits, all 1's.
 	static const ui64 ui64LeftMost_1 = 0x8000'0000'0000'0000;					// 64 bits, only the most significant is 1
 
-	inline BigInteger(bool empty, ui32 d) {									// Intended to create objects with a null list of digits
+	inline BigInteger(bool empty, ui32 d) {										// Intended to create objects with a null list of digits
 		if(!empty) {															// If empty == false this constructor creates a zero BigInteger
 			this->first = new Digit(d); 											// -Private constructor. The users are not suppose to use BigIntegers with a null
 			this->last = this->first;											//  list of digits
@@ -73,12 +73,13 @@ struct BigInteger {
 
 	// Assignment
 	BigInteger& operator = (const BigInteger&);
+	BigInteger& operator = (int);
 
 	// Arithmetic
 	friend BigInteger operator + (const BigInteger&, const BigInteger&);
 	friend BigInteger operator - (const BigInteger&, const BigInteger&);
 	friend BigInteger operator * (const BigInteger&, const BigInteger&);
-	BigInteger operator - ();
+	BigInteger 	operator - ();
 	BigInteger& operator ++ ();
 	BigInteger& operator -- ();
 	BigInteger& operator += (int);
@@ -98,35 +99,32 @@ struct BigInteger {
 		for(t = this->first; t != NULL; t = this->first) {
 			this->first = this->first->next;
 			delete t;
-		}
-		this->last = NULL;
+		}																		// At this point this->last == NULL
+		this->last = NULL;														// Before this line, this->last pointed to a freed memory location
 	}
-	void setAsZero();	// Calls the destructor and sets this BigInteger to zero
-	void setAsOne();	// Calls the destructor and sets this BigInteger to one
-	void setAs(int x);	// Calls the destructor and sets this BigInteger to x
-	void append(ui32);	// In the list of digits, puts a new element at the end
-	void push(ui32);	// In the list of digits, puts a new element at the beginning
-	ui32 pop(void);		// In the list of digits, returns the value of the last element and deletes it
-	bool isValidDigit(char, NumberBase);// Given a number base...
-	void plusEqualPositive(ui32 x); 	// Adds x to this BigInteger. Assuming this BigInteger is positive.
-	void minusEqualPositive(ui32 x); 	// Subtracts x from this BigInteger. Assuming this BigInteger is positive.
+	void setAsZero();															// Calls the destructor and sets this BigInteger to zero
+	void setAsOne();															// Calls the destructor and sets this BigInteger to one
+	void setAs(int x);															// Calls the destructor and sets this BigInteger to x
+	void append(ui32);															// In the list of digits, puts a new element at the end
+	void push(ui32);															// In the list of digits, puts a new element at the beginning
+	ui32 pop(void);																// In the list of digits, returns the value of the last element and deletes it
+	bool isValidDigit(char, NumberBase);										// Given a number base...
+	void plusEqualPositive(ui32 x);												// Adds x to this BigInteger. Assuming this BigInteger is positive.
+	void minusEqualPositive(ui32 x);											// Subtracts x from this BigInteger. Assuming this BigInteger is positive.
 
 	void addNonnegative(const BigInteger& x, BigInteger& result) const;			// -Computes the addition of 'this' with x and saves the result in 'result'.
 																				//  The addition is conducted as if the arguments were positives.
+
 	void subtractNonnegative(const BigInteger& x, BigInteger& result) const;	// -Computes the subtraction of 'this' with x and saves the result in 'result'.
 																				//  The subtraction is conducted as if the arguments were positives.
-	// -Computes the quotient divisor/dividend and the remainder
-	//	divisor%dividend, where the divided is a single precision number. The
-	//  result is saved in the 'result' array in the form [divisor/dividend,
-	//	divisor%dividend].
-	// -This function assumes its arguments are positive.
-	friend void shortDivisionPositive(const BigInteger& dividend, const ui32 divisor, BigInteger result[2]);
 
-	// -Same as shortDivisionPositive, but know we take in account the sign of the first argument
-	friend void shortDivision(const BigInteger& dividend, ui32 divisor, BigInteger result[2]);
+	void shortDivisionNonnegative(ui32 divisor, BigInteger result[2]) const;	// -Computes the quotient and remainder of non-negatives 'dividend' and 'divirsor'.
+								  												//  Result is saved in 'result' in the form [quotient, remainder]
 
-	// -Same as shortDivisionPositive, but know we take in account the sign.
-	friend void shortDivision(const BigInteger& dividend, int divisor, BigInteger result[2]);
+	void shortDivision(ui32 divisor, BigInteger result[2]) const;				// -Same as void shortDivision, but know we take in account the sign of
+																				//  'this'.
+	public:
+	void shortDivision(int  divisor, BigInteger result[2]) const;				// -Same as shortDivision above, but know we take in account the sign of 'divisor'
 
 	// -Computes the quotient divisor/dividend and the remainder
 	//	divisor%dividend. The result is saved in the 'result' array
