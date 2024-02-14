@@ -47,7 +47,7 @@ struct BigInteger {
 	private:																	// Attributes
 	struct Digit *first = NULL;													// First digit is the least significant.
 	struct Digit *last = NULL;													// Last digit is the most significant.
-	bool Positive = true;														// Sign. True for positive, false for negative.
+	bool NonNegative = true;														// Sign. True for NonNegative, false for negative.
 
 	static const ui32 halfBase = 0x80000000;									// Equals to 2^31 = 2^32/2 (half of the base). Intended for division algorithm
 	static const ui32 ui32MAX  = 0xFFFFFFFF;									// 32 bits, all 1's.
@@ -58,17 +58,17 @@ struct BigInteger {
 		if(!empty) {															// If empty == false this constructor creates a zero BigInteger
 			this->first = new Digit(d); 											// -Private constructor. The users are not suppose to use BigIntegers with a null
 			this->last = this->first;											//  list of digits
-			this->Positive = true;
+			this->NonNegative = true;
 		}
 	}
 
 	public:
-	inline BigInteger(): first(new Digit()), last(first), Positive(true) {};		// -Initialize as zero.
+	inline BigInteger(): first(new Digit()), last(first), NonNegative(true) {};		// -Initialize as zero.
 	inline ~BigInteger() {this->clean();}
 	BigInteger(i64);
 	inline BigInteger(int t) {
 		if(t < 0) {
-			this->Positive = false;
+			this->NonNegative = false;
 			t = -t;
 		}
 		this->first = new Digit((ui32)t);
@@ -124,8 +124,8 @@ struct BigInteger {
 	void push(ui32);															// In the list of digits, puts a new element at the beginning
 	ui32 pop(void);																// In the list of digits, returns the value of the last element and deletes it
 	bool isValidDigit(char, NumberBase);										// Given a number base...
-	void plusEqualPositive(ui32 x);												// Adds x to this BigInteger. Assuming this BigInteger is positive.
-	void minusEqualPositive(ui32 x);											// Subtracts x from this BigInteger. Assuming this BigInteger is positive.
+	void plusEqualNonNegative(ui32 x);												// Adds x to this BigInteger. Assuming this BigInteger is non negative.
+	void minusEqualNonNegative(ui32 x);											// Subtracts x from this BigInteger. Assuming this BigInteger is non negative.
 	int  compare(const BigInteger& x) const;									// Compares two BigIntegers. Returns -1 for this < x, 0 for this == x and 1 for
 																				// this > x
 
@@ -139,10 +139,10 @@ struct BigInteger {
 	}
 
 	void addNonnegative(const BigInteger& x, BigInteger& result) const;			// -Computes the addition of 'this' with x and saves the result in 'result'.
-																				//  The addition is conducted as if the arguments were positives.
+																				//  The addition is conducted as if the arguments were non negatives.
 
 	void subtractNonnegative(const BigInteger& x, BigInteger& result) const;	// -Computes the subtraction of 'this' with x and saves the result in 'result'.
-																				//  The subtraction is conducted as if the arguments were positives.
+																				//  The subtraction is conducted as if the arguments were non negatives.
 
 	void shortDivisionNonnegative(ui32 divisor, BigInteger result[2]) const;	// -Computes the quotient and remainder of non-negatives 'dividend' and 'divirsor'.
 								  												//  Result is saved in 'result' in the form [quotient, remainder]
