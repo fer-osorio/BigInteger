@@ -1,16 +1,16 @@
 #include"BigInteger.hpp"
 
 BigInteger::BigInteger(i64 number) {
-    ui64Toui32 tmp; tmp.ui64int = 0;                // We'll divide 'number' in its upper 32 bits and lower 32 bits
-    if(number < 0) {                                // Saving sign and changing to positive if necessary
+    ui64Toui32 tmp; tmp.ui64int = 0;                                            // We'll divide 'number' in its upper 32 bits and lower 32 bits
+    if(number < 0) {                                                            // Saving sign and changing to positive if necessary
         this->Positive = false;
         number = -number;
     } else
         this->Positive = true;
-    if(number > (i64)ui32MAX) {                     // In this case, we'll need two Digit objects to store the number.
+    if(number > (i64)ui32MAX) {                                                 // In this case, we'll need two Digit objects to store the number.
         tmp.ui64int = (ui64)number;
-        this->first = new Digit(tmp.uint[0]);        // Saving lower 32 bits
-        this->first->next = new Digit(tmp.uint[1]);  // Saving upper 32 bits
+        this->first = new Digit(tmp.uint[0]);                                    // Saving lower 32 bits
+        this->first->next = new Digit(tmp.uint[1]);                              // Saving upper 32 bits
         this->last = this->first->next;
     } else {
         this->first = new Digit((ui32)number);
@@ -556,11 +556,11 @@ const{
         "ive(const BigInteger& dividend, const ui32 divisor,BigInteger result[2"
         "]): Division by zero not defined.";
 	}
-	if(*this == 0) { result[0] = 0; result[1] = 0; return; }                 // 0 = 0·divisor + 0
+	if(*this == 0) { result[0] = 0; result[1] = 0; return; }                    // 0 = 0·divisor + 0
 
 	BigInteger::Digit* pd;
 	BigInteger tmp(true,0);                                                     // BigInteger with empty (NULL) digits list.
-	for(pd = this->first ; pd != NULL; pd = pd->next) {                       // Inverting the order of the digits.
+	for(pd = this->first ; pd != NULL; pd = pd->next) {                          // Inverting the order of the digits.
 	    tmp.push(pd->value);
 	}
 	ui64 r = 0;                                                                 // We'll save the remainder here
@@ -618,13 +618,28 @@ void BigInteger::shortDivision(int divisor, BigInteger result[2]) const{
     }
 }
 
-bool BigInteger::operator == (int x) const{
-    if(this->first == NULL) return false; // No comparison at all.
-    if(this->first->next != NULL) return false; // At this point, this is necessarily bigger than x
+void BigInteger::divisionNonnegative(const BigInteger &divisor, BigInteger
+result[2]) const {
+    if(result[0].first != NULL) result[0].clean();                               // -Before start, we "clean" what is inside the 'result' array.
+	if(result[1].first != NULL) result[1].clean();
+	if(divisor  == 0) {
+	    throw "Exception in BigInteger.cpp, function void shortDivisionNonnegat"
+        "ive(const BigInteger& dividend, const ui32 divisor,BigInteger result[2"
+        "]): Division by zero not defined.";
+	}
+	if(*this == 0) { result[0] = 0; result[1] = 0; return; }                    // 0 = 0·divisor + 0
+    if(divisor.isSinglePrecision()) {                                           // Division by a single precision number (32-bits integer), using short division
+        this->shortDivisionNonnegative(divisor.first->value, result);            // for non negative numbers.
+        return;
+    }
+}
 
-    bool positive = x >= 0; // Saving the sign of x
-    if(x < 0) x = -x;       // Saving absolute value of x
-    if(x == 0 && this->first->value == 0) return true;  // Special case; zero can have any of the signs.
+bool BigInteger::operator == (int x) const{
+    if(this->first == NULL) return false;                                        // No comparison at all.
+    if(this->first->next != NULL) return false;                                  // At this point, this is necessarily bigger than x
+    bool positive = x >= 0;                                                     // Saving the sign of x
+    if(x < 0) x = -x;                                                           // Saving absolute value of x
+    if(x == 0 && this->first->value == 0) return true;                           // Special case; zero can have any of the signs.
     return positive == this->Positive && this->first->value == (ui32)x;
 }
 
@@ -632,9 +647,51 @@ bool BigInteger::operator != (int x) const {
     return !(*this == x);
 }
 
-BigInteger BigInteger::operator - () {
+int BigInteger::compare(const BigInteger &x) const {                                  // We are assuming that the sing of a zero BigInteger is positive.
+
+    /*  Let u = u[n]b^n + u[n-1]b^{n-1} + ... + u[0] and v = v[n]b^n + v[n-1]b^{n-1} + ... + v[0] be positive numbers represented in base b, let i be an integer
+        in the range 0 <= i <= n, then we have that u[i] < v[i] implies
+        u[i]b^{i} + ... + u[0]  <= (v[i] - 1)b^{i} + (u[i-1]b^{i-1} + ... + u[0])
+                                <  (v[i] - 1)b^{i} + v[i]b^{i}                  , using x^n > y[n-1]·x^{n-1} + ... + y[1]·x + y[0] for integers x>0, 0 <= y[i] < x
+                                <= v[i]b^{i} + v[i-1]b^{i-1} + ... + v[0].
+        In resume u[i] < v[i] implies u[i]b^{i} + ... + u[0] < v[i]b^{i} + ... + v[0].
+        So, in order to compare u and v, we'll first look at the signs, then at the number of digits and lastly the comparison of each pair of digits   */
+
+    Digit *td = this->first, *xd = x.first;                                       // This variables will run through 'this' digits and 'x' digits
+    int  result = 0;                                                            // -1 for this < x, 0 for this == x and 1 for this > x
+    bool bothNegative = false;                                                  // If both signs are negative we'll have to invert the result
+
+    if(!this->Positive) {                                                       // Checking signs
+        if(x.Positive) return -1;                                               // 'this' is negative and x is positive, therefore this < x. Returning -1
+        bothNegative = true;                                                    // At this point, both are negative.
+    } else if(!x.Positive) return 1;                                            // 'this' is Positive and x is negative, therefore this > x. Returning  1
+
+    for(;td != NULL; td = td->next, xd = xd->next) {                            // Comparing digit by digit from the least significant to the most significant
+        if(xd == NULL) {
+            if(bothNegative) return -1;                                         // x has fewer digits than 'this', this > x if both positive and this < x if both
+            else             return  1;                                         // negative
+        }
+        if(td->value != xd->value) {                                            // If digits are equal, don't change the value of result
+            if(td->value < xd->value) result = -1;                              // Inside this 'If', in this particular cycle, this < x holds true
+            else                      result =  1;                              // Inside this 'If', in this particular cycle, this > x holds true
+        }
+    }
+    if(xd != NULL) {
+            if(bothNegative) return  1;                                         // x has more digits than 'this', this < x if both positive and this > x if both
+            else             return -1;                                         // negative
+    }
+    return result;
+}
+
+bool BigInteger::operator < (const BigInteger& x) const {
+    if(this->compare(x) == -1) return true;
+    else return false;
+}
+
+BigInteger BigInteger::operator - () const {
     BigInteger r = *this;
-    r.Positive = !this->Positive;
+    if(r != 0) r.Positive = !this->Positive;                                    // Guarding against a zero with negative sign
+    else       r.Positive = true;
     return r;
 }
 
@@ -807,26 +864,26 @@ void BigInteger::append(ui32 x) {
 }
 
 ui32 BigInteger::pop() {
-    if(this->first == NULL) return 0;       // NULL list, this should be handle by an exception.
-    ui64 r = this->last->value;            // Saving last value
-    if(this->first->next == NULL) {         // Single precision number
+    if(this->first == NULL) return 0;                                            // NULL list, this should be handle by an exception.
+    ui64 r = this->last->value;                                                 // Saving last value
+    if(this->first->next == NULL) {                                              // Single precision number
         if(r != this->first->value)
             {/*Some exception here*/}
         delete this->first;
-        this->first = this->last = NULL;    // Empty digits list, maybe this should throw an exception
+        this->first = this->last = NULL;                                         // Empty digits list, maybe this should throw an exception
         return r;
     }
     Digit* aux;
-    for(aux = this->first; aux->next->next != NULL; aux = aux->next) {} // Reaching the element before the last Digit object
-    delete this->last;                     // Updating last attribute
+    for(aux = this->first; aux->next->next != NULL; aux = aux->next) {}          // Reaching the element before the last Digit object
+    delete this->last;                                                          // Updating last attribute
     this->last = aux;
     this->last->next = NULL;
     return r;
 }
 
-void BigInteger::push(ui32 x) {            // New element at the beginning of the Digits list
+void BigInteger::push(ui32 x) {                                                 // New element at the beginning of the Digits list
     Digit* _first = new Digit(x);
-    if(this->last == NULL) this->last = _first;                    // Guarding against BigInteger initialized with NULL pointer.)
+    if(this->last == NULL) this->last = _first;                                  // Guarding against BigInteger initialized with NULL pointer.)
     _first->next = this->first;
     this->first = _first;
 }

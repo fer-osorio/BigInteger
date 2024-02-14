@@ -7,6 +7,7 @@
 typedef std::uint64_t ui64;
 typedef std::int64_t   i64;
 typedef std::uint32_t ui32;
+typedef std::uint16_t ui16;
 typedef unsigned char ui08;
 
 union ui64Toui08 {																// Intended to cast from 64-bits unsigned integer to 8 unsigned char's
@@ -24,6 +25,11 @@ union ui64Toui32 {																// Intended to cast from 64-bits unsigned inte
 	ui32 uint[2];
 };
 
+union ui32Toui16 {																// Intended to cast from 32-bits unsigned integer to 2 unsigned short's
+	ui32 ui32int;
+	ui16 ushort[2];
+};
+
 struct BigInteger {
 	public: enum NumberBase {													// "public" is not necessary here, it's just for readability
 		BINARY,																	// Number bases for printing
@@ -38,14 +44,14 @@ struct BigInteger {
 		Digit() : value(0), next(NULL) {}
 		Digit(ui32 _value) : value(_value), next(NULL) {}
 	};
-
 	private:																	// Attributes
 	struct Digit *first = NULL;													// First digit is the least significant.
 	struct Digit *last = NULL;													// Last digit is the most significant.
-	bool Positive = true;														// Sing. True for positive, false for negative.
+	bool Positive = true;														// Sign. True for positive, false for negative.
 
-	static const ui32 ui32MAX = 0xFFFFFFFF;										// 32 bits, all 1's.
-	static const ui64 ui64MAX = 0xFFFFFFFFFFFFFFFF;								// 64 bits, all 1's.
+	static const ui32 halfBase = 0x80000000;									// Equals to 2^31 = 2^32/2 (half of the base). Intended for division algorithm
+	static const ui32 ui32MAX  = 0xFFFFFFFF;									// 32 bits, all 1's.
+	static const ui64 ui64MAX  = 0xFFFFFFFFFFFFFFFF;							// 64 bits, all 1's.
 	static const ui64 ui64LeftMost_1 = 0x8000'0000'0000'0000;					// 64 bits, only the most significant is 1
 
 	inline BigInteger(bool empty, ui32 d) {										// Intended to create objects with a null list of digits
@@ -60,6 +66,14 @@ struct BigInteger {
 	inline BigInteger(): first(new Digit()), last(first), Positive(true) {};		// -Initialize as zero.
 	inline ~BigInteger() {this->clean();}
 	BigInteger(i64);
+	inline BigInteger(int t) {
+		if(t < 0) {
+			this->Positive = false;
+			t = -t;
+		}
+		this->first = new Digit((ui32)t);
+		this->last = this->first;
+	}
 	BigInteger(const BigInteger&);
 	BigInteger(const char[], ui64, bool = true);								// -Initializing with an array of bytes (char's). Little endianess is used.
 
@@ -79,7 +93,7 @@ struct BigInteger {
 	friend BigInteger operator + (const BigInteger&, const BigInteger&);
 	friend BigInteger operator - (const BigInteger&, const BigInteger&);
 	friend BigInteger operator * (const BigInteger&, const BigInteger&);
-	BigInteger 	operator - ();
+	BigInteger 	operator - () const;
 	BigInteger& operator ++ ();
 	BigInteger& operator -- ();
 	BigInteger& operator += (int);
@@ -87,6 +101,7 @@ struct BigInteger {
 	// Comparison
 	bool operator == (int) const;
 	bool operator != (int) const;
+	bool operator < (const BigInteger&) const;
 
 	friend std::ostream& operator << (std::ostream&, BigInteger);
 
@@ -111,6 +126,17 @@ struct BigInteger {
 	bool isValidDigit(char, NumberBase);										// Given a number base...
 	void plusEqualPositive(ui32 x);												// Adds x to this BigInteger. Assuming this BigInteger is positive.
 	void minusEqualPositive(ui32 x);											// Subtracts x from this BigInteger. Assuming this BigInteger is positive.
+	int  compare(const BigInteger& x) const;									// Compares two BigIntegers. Returns -1 for this < x, 0 for this == x and 1 for
+																				// this > x
+
+	inline bool isSinglePrecision() const {
+		if(this->first == NULL) {
+			throw "\nException in BigInteger.hpp, function inline bool is"
+			"SinglePressition().BigInteger with null list of digits...\n";
+		}
+		if(this->first->next != NULL) return false;
+		return true;
+	}
 
 	void addNonnegative(const BigInteger& x, BigInteger& result) const;			// -Computes the addition of 'this' with x and saves the result in 'result'.
 																				//  The addition is conducted as if the arguments were positives.
@@ -126,10 +152,10 @@ struct BigInteger {
 	public:
 	void shortDivision(int  divisor, BigInteger result[2]) const;				// -Same as shortDivision above, but know we take in account the sign of 'divisor'
 
-	// -Computes the quotient divisor/dividend and the remainder
-	//	divisor%dividend. The result is saved in the 'result' array
-	//	in the form [divisor/dividend, divisor%dividend].
-	friend void quotientRemainder(const BigInteger& dividend, const BigInteger& divisor, BigInteger result[2]);
+	void divisionNonnegative(const BigInteger& divisor, BigInteger result[2])	// -Computes the quotient and the remainder between 'this' and 'divosor'
+	const;																		// -The result is saved in the array 'result' in the form [quotient, remainder]
 };
+
 void ui64Product(ui64, ui64, ui64[2]);
+
 #endif

@@ -55,7 +55,11 @@ int main(void)
 
     n0.shortDivision(0x10000, quorem);
     std::cout << "n0 / 2^16 = " ; quorem[0].printHexln();
-    std::cout << "n0 % 2^16 = " ; quorem[1].printHexln();
+    std::cout << "n0 % 2^16 = " ; quorem[1].printHexln(); std::cout << '\n';
+
+    if(n1 < n0) { n1.printHex(); std::cout <<  " < "; n0.printHexln(); }
+    if(n1 < 0)  { n1.printHex(); std::cout << " < 0\n"; }
+    if(quorem[0] < n0)  { quorem[0].printHex(); std::cout << " < "; n0.printHexln(); }
 
     return 0;
 }
