@@ -30,6 +30,12 @@ union ui32Toui16 {																// Intended to cast from 32-bits unsigned inte
 	ui16 ushort[2];
 };
 
+static const ui32 _2power31   = 0x80000000;										// Equals to 2^31 = 2^32/2 (half of the base). Intended for division algorithm
+static const ui32 ui32MAX     = 0xFFFFFFFF;										// 32 bits, all 1's.
+static const ui32 ui32wordlen = 32;
+static const ui64 ui64MAX     = 0xFFFFFFFFFFFFFFFF;								// 64 bits, all 1's.
+static const ui64 ui64LeftMost_1 = 0x8000'0000'0000'0000;						// 64 bits, only the most significant is 1
+
 struct BigInteger {
 	public: enum NumberBase {													// "public" is not necessary here, it's just for readability
 		BINARY,																	// Number bases for printing
@@ -39,7 +45,7 @@ struct BigInteger {
 		DECIMAL
 	};
 	private: struct Digit {
-		ui32   value;															// Here we set our radix to 2^32
+		ui32   value;															// Here we set our radix base to 2^32
 		Digit* next;
 		Digit() : value(0), next(NULL) {}
 		Digit(ui32 _value) : value(_value), next(NULL) {}
@@ -47,15 +53,10 @@ struct BigInteger {
 	private:																	// Attributes
 	struct Digit *first = NULL;													// First digit is the least significant.
 	struct Digit *last = NULL;													// Last digit is the most significant.
-	bool NonNegative = true;														// Sign. True for NonNegative, false for negative.
-
-	static const ui32 halfBase = 0x80000000;									// Equals to 2^31 = 2^32/2 (half of the base). Intended for division algorithm
-	static const ui32 ui32MAX  = 0xFFFFFFFF;									// 32 bits, all 1's.
-	static const ui64 ui64MAX  = 0xFFFFFFFFFFFFFFFF;							// 64 bits, all 1's.
-	static const ui64 ui64LeftMost_1 = 0x8000'0000'0000'0000;					// 64 bits, only the most significant is 1
+	bool NonNegative = true;													// Sign. True for NonNegative, false for negative.
 
 	inline BigInteger(bool empty, ui32 d) {										// Intended to create objects with a null list of digits
-		if(!empty) {															// If empty == false this constructor creates a zero BigInteger
+		if(!empty) {															// If empty is false this constructor creates a d BigInteger
 			this->first = new Digit(d); 											// -Private constructor. The users are not suppose to use BigIntegers with a null
 			this->last = this->first;											//  list of digits
 			this->NonNegative = true;
@@ -103,6 +104,8 @@ struct BigInteger {
 	bool operator != (int) const;
 	bool operator < (const BigInteger&) const;
 
+	ui32 operator [] (ui32 n) const;											// Returns the ui32 in the list place |n| mod l where l is the length of the list
+
 	friend std::ostream& operator << (std::ostream&, BigInteger);
 
 	void printHex() const;
@@ -117,6 +120,7 @@ struct BigInteger {
 		}																		// At this point this->last == NULL
 		this->last = NULL;														// Before this line, this->last pointed to a freed memory location
 	}
+	ui32 len();																	// Returns length of list of digits
 	void setAsZero();															// Calls the destructor and sets this BigInteger to zero
 	void setAsOne();															// Calls the destructor and sets this BigInteger to one
 	void setAs(int x);															// Calls the destructor and sets this BigInteger to x
@@ -128,7 +132,6 @@ struct BigInteger {
 	void minusEqualNonNegative(ui32 x);											// Subtracts x from this BigInteger. Assuming this BigInteger is non negative.
 	int  compare(const BigInteger& x) const;									// Compares two BigIntegers. Returns -1 for this < x, 0 for this == x and 1 for
 																				// this > x
-
 	inline bool isSinglePrecision() const {
 		if(this->first == NULL) {
 			throw "\nException in BigInteger.hpp, function inline bool is"

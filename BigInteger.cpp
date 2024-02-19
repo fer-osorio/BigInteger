@@ -150,8 +150,8 @@ BigInteger::BigInteger(const char bytes[], ui64 size, bool nonNegative)
         setAsZero();
         return;
     }
-    ui64 q = size >> 2; // q = size / 4;
-    ui64 r = size &  3; // r = size % 4;
+    ui64 q = size >> 2;                                                         // q = size / 4;
+    ui64 r = size &  3;                                                         // r = size % 4;
     ui32Toui08 buffer; buffer.ui32int = 0;
     ui64 i = 0, j;
 
@@ -257,7 +257,7 @@ void BigInteger::addNonnegative(const BigInteger& x, BigInteger& result) const {
     if(dt != NULL) largest = dt;                                                // In case of having to numbers of different amount of digits.
     else largest = dx;
     while(largest != NULL) {
-        if((carriage == 1) && (largest->value == BigInteger::ui32MAX))
+        if((carriage == 1) && (largest->value == ui32MAX))
             result.append(0);                                                   // Preserve carriage as 1.
         else {
             result.append(largest->value + carriage);
@@ -333,7 +333,7 @@ const {
 	}
     while(d0 != NULL && d1 != NULL) {
         if((d0->value < d1->value) || (d0->value == d1->value && load == 1)) {  // We need to "ask for a loan". k = (k-1) + 1; in this case 2^32 = (2^32-1) + 1.
-            result.append((BigInteger::ui32MAX-d1->value+1-load)+d0->value);    // Using (a_{i} - b_{i} - load) + 2^32 == ((2^32-1) - b_{i} + 1 - load) + a_{i};
+            result.append((ui32MAX-d1->value+1-load)+d0->value);                // Using (a_{i} - b_{i} - load) + 2^32 == ((2^32-1) - b_{i} + 1 - load) + a_{i};
             load = 1;
         } else {
             result.append(d0->value - d1->value - load);
@@ -345,7 +345,7 @@ const {
     if(d0 != NULL) {                                                            // In case of still having digits in the biggest number
         while(d0->next != NULL) {
             if(d0->value == 0 && load == 1) {                                   // We have a zero digit and a non zero load, asking for another loan
-                result.append(BigInteger::ui32MAX);
+                result.append(ui32MAX);
                 load = 1;
             } else {                                                            // Found non zero digit, taking the loan from it.
                 if(load == 1) {
@@ -552,14 +552,14 @@ const{
 	}
 	if(*this == 0) { result[0] = 0; result[1] = 0; return; }                    // 0 = 0·divisor + 0
 
-	BigInteger::Digit* pd;
-	BigInteger tmp(true,0);                                                     // BigInteger with empty (NULL) digits list.
+	Digit* pd;
+	BigInteger dividendInverted(true,0);                                        // BigInteger with empty (NULL) digits list.
 	for(pd = this->first ; pd != NULL; pd = pd->next) {                          // Inverting the order of the digits.
-	    tmp.push(pd->value);
+	    dividendInverted.push(pd->value);
 	}
 	ui64 r = 0;                                                                 // We'll save the remainder here
 	ui64Toui32 t;                                                               // Intended for the 'cast' of a 64-bits integer to an array of two 32-bits integer
-	for(pd = tmp.first; pd != NULL; pd = pd->next) {
+	for(pd = dividendInverted.first; pd != NULL; pd = pd->next) {
         t.uint[1] = r; t.uint[0] = pd->value;                                   // t.ui64int = r*2^32 + pd->value
         result[0].push((ui32)(t.ui64int/(ui64)divisor));
         r = t.ui64int % (ui64)divisor;
@@ -614,6 +614,8 @@ void BigInteger::shortDivision(int divisor, BigInteger result[2]) const{
 
 void BigInteger::divisionNonnegative(const BigInteger &divisor, BigInteger
 result[2]) const {
+    /*  The division algorithm implemented here can be found in the book "(Donald Knuth) The art of computer programming, volume 2. Seminumerical Algorithms. Third
+        Edition", in pages 272 and 273.*/
     if(result[0].first != NULL) result[0].clean();                               // -Before start, we "clean" what is inside the 'result' array.
 	if(result[1].first != NULL) result[1].clean();
 	if(divisor  == 0) {
@@ -625,13 +627,49 @@ result[2]) const {
     if(divisor.isSinglePrecision()) {                                           // Division by a single precision number (32-bits integer), using short division
         this->shortDivisionNonnegative(divisor.first->value, result);            // for non negative numbers.
         return;
+    }                                                                           // At this point of the code we know the divisor is not a single precision number
+    if(this->operator<(divisor)) {                                              // If u < v, then u = 0·v + u, therefore int(u/v) = 0 and u mod v = u
+        result[0] = 0; result[1] = *this;
+        return;
+    }
+
+    BigInteger dividendInverted(true,0);                                        // BigInteger with empty (NULL) digits list.
+    BigInteger  divisorInverted(true,0);                                        // BigInteger with empty (NULL) digits list.
+    Digit *d0 = this->first, *d1 = divisor.first;                                 // Pointer to digits, intended to run through the list of digits
+    ui32 twoLeadDigitsDivisor[2];                                               // Two leading digits of the divisor
+    ui32 threeLeadDigitsDividend[3];                                            // Three leading digits of the dividend
+    ui32 leftShif = 0;                                                          // Left shift for the virtual normalization
+
+    ui32 difListLen = 0;                                                        // Difference between the list of the dividend and the list of the divisor
+
+    for(; d0 != NULL; d0 = d0->next) {
+        dividendInverted.push(d0->value);                                       // Inverting the order of the digits of the dividend
+        ++difListLen;                                                           // Computing list length of the dividend
+    }
+	for(; d1 != NULL; d1 = d1->next) {
+	    divisorInverted.push(d1->value);                                        // Inverting the order of the digits of the divisor
+	    --difListLen;                                                           // Computing list length difference
+	}
+    twoLeadDigitsDivisor[1] = divisorInverted.first->value;                      // Initializing with most significant digit of the divisor
+    while(twoLeadDigitsDivisor[1] < _2power31) {                                // Start of the virtual normalization process for the divisor
+        twoLeadDigitsDivisor[1] <<= 1;
+        ++leftShif;
+    }
+    twoLeadDigitsDivisor[1] |= divisorInverted[1] >> (ui32wordlen - leftShif);  // Shifting to the left the first two digits
+    twoLeadDigitsDivisor[0]  = divisorInverted[1] << leftShif;
+    if(this->first->next->next != NULL) {                                        // If the divisor has at least three digits, integrate that digit to the shifting
+        twoLeadDigitsDivisor[0] |=
+        divisorInverted[2] >> (ui32wordlen - leftShif);                         // End of the virtual normalization process for the divisor
+    }
+    for(difListLen++; difListLen > 0; difListLen--) {                           // difListLen++ will make difListLen > 0 a valid ending condition
+
     }
 }
 
 bool BigInteger::operator == (int x) const{
     if(this->first == NULL) return false;                                        // No comparison at all.
     if(this->first->next != NULL) return false;                                  // At this point, this is necessarily bigger than x
-    bool nonNegative = x >= 0;                                                     // Saving the sign of x
+    bool nonNegative = x >= 0;                                                  // Saving the sign of x
     if(x < 0) x = -x;                                                           // Saving absolute value of x
     if(x == 0 && this->first->value == 0) return true;                           // Special case; zero can have any of the signs.
     return nonNegative == this->NonNegative && this->first->value == (ui32)x;
@@ -643,10 +681,10 @@ bool BigInteger::operator != (int x) const {
 
 int BigInteger::compare(const BigInteger &x) const {                                  // We are assuming that the sing of a zero BigInteger is non negative.
 
-    /*  Let u = u[n]b^n + u[n-1]b^{n-1} + ... + u[0] and v = v[n]b^n + v[n-1]b^{n-1} + ... + v[0] be non negative numbers represented in base b, let i be an integer
-        in the range 0 <= i <= n, then we have that u[i] < v[i] implies
-        u[i]b^{i} + ... + u[0]  <= (v[i] - 1)b^{i} + (u[i-1]b^{i-1} + ... + u[0])
-                                <  (v[i] - 1)b^{i} + v[i]b^{i}                  , using x^n > y[n-1]·x^{n-1} + ... + y[1]·x + y[0] for integers x>0, 0 <= y[i] < x
+    /*  Let u = u[n]b^n + u[n-1]b^{n-1} + ... + u[0] and v = v[n]b^n + v[n-1]b^{n-1} + ... + v[0] be non negative numbers represented in base b, let i be an
+        integer in the range 0 <= i <= n, then we have that u[i] < v[i] implies
+        u[i]b^{i} + ... + u[0]  <= (v[i] - 1)b^{i} + (u[i-1]b^{i-1} +...+ u[0])
+                                <  (v[i] - 1)b^{i} + v[i]b^{i}                  , using x^n > y[n-1]·x^{n-1} +...+ y[1]·x + y[0] for integers x>0, 0 <= y[i] < x
                                 <= v[i]b^{i} + v[i-1]b^{i-1} + ... + v[0].
         In resume u[i] < v[i] implies u[i]b^{i} + ... + u[0] < v[i]b^{i} + ... + v[0].
         So, in order to compare u and v, we'll first look at the signs, then at the number of digits and lastly the comparison of each pair of digits   */
@@ -690,25 +728,25 @@ BigInteger BigInteger::operator - () const {
 }
 
 BigInteger& BigInteger::operator++() {
-    Digit *td = this->first;    // this digits
+    Digit *td = this->first;                                                     // this digits
 
     if(this->NonNegative == true) {
-        while(td != NULL && td->value == BigInteger::ui32MAX) { // Moving the carriage to the next digit
+        while(td != NULL && td->value == ui32MAX) {                             // Moving the carriage to the next digit
             td->value = 0;
             td = td->next;
         }
-        if(td != NULL) ++td->value; // Finally we add the carriage
+        if(td != NULL) ++td->value;                                             // Finally we add the carriage
         else this->append(1);
     }
     else {
-        if(*this == 0)  { this->setAsOne();  return *this;} // Cases where the zero is involved.
+        if(*this == 0)  { this->setAsOne();  return *this;}                     // Cases where the zero is involved.
         if(*this == -1) { this->setAsZero(); return *this;}
-        while(td != NULL && td->value == 0) { // Moving the loan to the next digit
-            td->value = BigInteger::ui32MAX;
+        while(td != NULL && td->value == 0) {                                   // Moving the loan to the next digit
+            td->value = ui32MAX;
             td = td->next;
         }
         if(td != NULL) {
-            --td->value; // Finally we add the carriage
+            --td->value;                                                        // Finally we add the carriage
             if(td == this->last && td->value == 0) this->pop();
         }
         else {/*Exception here: The most significant digit can't be zero*/}
@@ -717,41 +755,45 @@ BigInteger& BigInteger::operator++() {
 }
 
 BigInteger& BigInteger::operator -- () {
-    this->NonNegative = !this->NonNegative; // Using x-1 = -(-x + 1)
+    this->NonNegative = !this->NonNegative;                                     // Using x-1 = -(-x + 1)
     this->operator++();
-    if(this->operator==(0)) this->NonNegative = !this->NonNegative; // If it's zero it already has the correct sign (non negative)
+    if(this->operator==(0)) this->NonNegative = !this->NonNegative;             // If it's zero it already has the correct sign (non negative)
     return *this;
 }
 
-void BigInteger::plusEqualNonNegative(ui32 x) {// Assuming this BigInteger is non negative.
-    Digit* td = this->first;   // This digits
+ui32 BigInteger::operator [] (ui32 n) const {                                   // Supposing we don't have a null digits list
+    Digit *dt;                                                                  // This digits
+    for(dt=this->first; n>0; n--, dt=dt->next) if(dt == NULL) dt = this->first;   // If we're at the end, return to the beginning
+    return dt->value;
+}
+
+void BigInteger::plusEqualNonNegative(ui32 x) {                                 // Assuming this BigInteger is non negative.
+    Digit* td = this->first;                                                     // This digits
     ui64Toui32 t = {0};
-    t.ui64int = td->value + x;// Adding to the first element
-    td->value = t.uint[0];    // first element = (td->value + v) % 2^32
-    if(t.uint[1] > 0) {       // We have a non zero carriage (carriage = 1)
-        for(td = td->next; td != NULL && td->value == BigInteger::ui32MAX; td = td->next) {
-            // While the value of the current "Digit" is ui32MAX (2^32-1) we'll change that value to zero and preserve the carriage
-            td->value = 0;
+    t.ui64int = td->value + x;                                                  // Adding to the first element
+    td->value = t.uint[0];                                                      // first element = (td->value + v) % 2^32
+    if(t.uint[1] > 0) {                                                         // We have a non zero carriage (carriage = 1)
+        for(td = td->next; td != NULL && td->value == ui32MAX; td = td->next) { // While current Digit value is ui32MAX we'll change that value to zero and
+            td->value = 0;                                                      // preserve the carriage
         }
-            if(td == NULL) this->append(1); // Depositing the carriage in a new digit
-        else ++td->value;                   // Adding the carriage to a digit which value is not 2^32-1
+        if(td == NULL) this->append(1);                                         // Depositing the carriage in a new digit
+        else ++td->value;                                                       // Adding the carriage to a digit which value is not 2^32-1
     }
 }
 
-void BigInteger::minusEqualNonNegative(ui32 x) {// Assuming this BigInteger is non negative.
-    Digit *td = this->first;     // This digits
-    if(x > td->value) {         // Here we need a loan from the next digit.
-        if(td->next == NULL) {  // In case of single precision number.
+void BigInteger::minusEqualNonNegative(ui32 x) {                                // Assuming this BigInteger is non negative.
+    Digit *td = this->first;                                                     // This digits
+    if(x > td->value) {                                                         // Here we need a loan from the next digit.
+        if(td->next == NULL) {                                                  // In case of single precision number.
             td->value = x - td->value;
             this->NonNegative = !this->NonNegative;
             return;
         }
-        //td->value = BigInteger::ui32MAX - (ui32)v + td->value + 1;
-        td->value += BigInteger::ui32MAX - x; // Adding to the first digit and taking a loan
+        //td->value = ui32MAX - (ui32)v + td->value + 1;
+        td->value += ui32MAX - x;                                               // Adding to the first digit and taking a loan
         td->value++;
-        for(td = td->next; td != NULL && td->value == 0; td = td->next) {
-            // If the next digit is zero, we'll need to take the loan from the next digit to that one
-            td->value = BigInteger::ui32MAX;
+        for(td = td->next; td != NULL && td->value == 0; td = td->next) {       // If the next digit is zero, we'll need to take the loan from the next digit to
+            td->value = ui32MAX;                                                // that one
         }
         if(td != NULL) {
             --td->value;
@@ -765,13 +807,20 @@ void BigInteger::minusEqualNonNegative(ui32 x) {// Assuming this BigInteger is n
 BigInteger& BigInteger::operator += (int v) {
     if(v >= 0) {
         if(this->NonNegative == true) this->plusEqualNonNegative((ui32)v);
-        else this->minusEqualNonNegative((ui32) v);// Using the fact -a + v == -(a - v)
+        else this->minusEqualNonNegative((ui32) v);                             // Using the fact -a + v == -(a - v)
     } else {
         v = -v;
         if(this->NonNegative == true) this->minusEqualNonNegative((ui32)v);
-        else this->plusEqualNonNegative((ui32)v);        // Using the fact -a - v == -(a + v)
+        else this->plusEqualNonNegative((ui32)v);                               // Using the fact -a - v == -(a + v)
     }
     return *this;
+}
+
+ui32 BigInteger::len() {
+    ui32 l;                                                                     // Will hold the length
+    Digit* dt;                                                                  // Digits of this
+    for(l = 0, dt = this->first; dt != NULL; dt = dt->next) {l++;}               // Computing length
+    return l;
 }
 
 void BigInteger::printHex() const {
@@ -810,10 +859,10 @@ void BigInteger::printHex() const {
 
     while(0 < length--) {
         printf(",");
-        r = this->first; i = 0;                              // -Getting to the last unread digit.
+        r = this->first; i = 0;                                                  // -Getting to the last unread digit.
         while(i++ < length) {r = r->next;}
         buffer.ui32int = r->value;
-        for(i = 3; i >= 0; i--) {                           // Printing non-zero bytes
+        for(i = 3; i >= 0; i--) {                                               // Printing non-zero bytes
             if(buffer.uchar[i] < 10) printf("0");
             printf("%X",buffer.uchar[i]);
         }
@@ -863,9 +912,7 @@ ui32 BigInteger::pop() {
     if(this->first->next == NULL) {                                              // Single precision number
         if(r != this->first->value)
             {/*Some exception here*/}
-        delete this->first;
-        this->first = this->last = NULL;                                         // Empty digits list, maybe this should throw an exception
-        return r;
+        return r;                                                               // Don't deleting unique list element in order to prevent an empty list
     }
     Digit* aux;
     for(aux = this->first; aux->next->next != NULL; aux = aux->next) {}          // Reaching the element before the last Digit object
