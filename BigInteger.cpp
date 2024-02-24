@@ -633,36 +633,78 @@ result[2]) const {
         return;
     }
 
-    BigInteger dividendInverted(true,0);                                        // BigInteger with empty (NULL) digits list.
-    BigInteger  divisorInverted(true,0);                                        // BigInteger with empty (NULL) digits list.
-    Digit *d0 = this->first, *d1 = divisor.first;                                 // Pointer to digits, intended to run through the list of digits
-    ui32 twoLeadDigitsDivisor[2];                                               // Two leading digits of the divisor
-    ui32 threeLeadDigitsDividend[3];                                            // Three leading digits of the dividend
+    ui32 _2LeadDigitsDvsor[2]  = {0,0};                                         // Two leading digits of the divisor
+    ui32 _3LeadDigitsDvdend[3] = {0,0,0};                                       // Three leading digits of the dividend
     ui32 leftShif = 0;                                                          // Left shift for the virtual normalization
+    const ui32 lenDvdend = this->len();                                         // Length of dividend list of digits
+    const ui32 lenDvsor = divisor.len();                                        // Length of divisor list of digits
+    ui32 lenDiff = lenDvdend - lenDvsor;                                         // Difference between the list of the dividend and the list of the divisor
+    ui64 rCap = 0;
+    ui64Toui32 qCap = {0}, aux0 = {0};                                          // Trial quotient and trial remainder for each single division cycle
+    bool newLeadDigit;                                                          // Flags the introduction of a new digit caused by the normalization process
+    ui32 aux1 = 0;                                                              // Auxiliary variable. Will help in small optimizations.
+    ui64 aux2 = 0;                                                              // Auxiliary variable. Will help in small optimizations.
 
-    ui32 difListLen = 0;                                                        // Difference between the list of the dividend and the list of the divisor
+    if(lenDvdend == 2) {
+        qCap.uint[0] = this->first->value;                                       // Converting from two unsigned int to one unsigned int of 64 bits in each case
+        qCap.uint[1] = this->first->next->value;                                 // ...
+        aux0.uint[0] = divisor.first->value;                                     // In this case aux0 is just an auxiliary variable
+        aux0.uint[1] = divisor.first->next->value;                               // ...
+        result[0] = qCap.ui64int / aux0.ui64int;                                // Using 64 bits operation to get the results
+        result[1] = qCap.ui64int % aux0.ui64int;                                // ...
+        return;
+    }                                                                           // At this line we know we have at least three precision places in the dividend
 
-    for(; d0 != NULL; d0 = d0->next) {
-        dividendInverted.push(d0->value);                                       // Inverting the order of the digits of the dividend
-        ++difListLen;                                                           // Computing list length of the dividend
-    }
-	for(; d1 != NULL; d1 = d1->next) {
-	    divisorInverted.push(d1->value);                                        // Inverting the order of the digits of the divisor
-	    --difListLen;                                                           // Computing list length difference
-	}
-    twoLeadDigitsDivisor[1] = divisorInverted.first->value;                      // Initializing with most significant digit of the divisor
-    while(twoLeadDigitsDivisor[1] < _2power31) {                                // Start of the virtual normalization process for the divisor
-        twoLeadDigitsDivisor[1] <<= 1;
+    _2LeadDigitsDvsor[1] = divisor[lenDvsor - 1];                               // Initializing with most significant digit of the divisor
+    while(_2LeadDigitsDvsor[1] < _2power31) {                                   // Start of the virtual normalization process for the divisor
+        _2LeadDigitsDvsor[1] <<= 1;
         ++leftShif;
     }
-    twoLeadDigitsDivisor[1] |= divisorInverted[1] >> (ui32wordlen - leftShif);  // Shifting to the left the first two digits
-    twoLeadDigitsDivisor[0]  = divisorInverted[1] << leftShif;
-    if(this->first->next->next != NULL) {                                        // If the divisor has at least three digits, integrate that digit to the shifting
-        twoLeadDigitsDivisor[0] |=
-        divisorInverted[2] >> (ui32wordlen - leftShif);                         // End of the virtual normalization process for the divisor
-    }
-    for(difListLen++; difListLen > 0; difListLen--) {                           // difListLen++ will make difListLen > 0 a valid ending condition
+    aux1 = divisor[lenDvsor - 2];
+    _2LeadDigitsDvsor[1] |= aux1 >> (ui32wordlen - leftShif);                   // Shifting to the left the first two digits
+    _2LeadDigitsDvsor[0]  = aux1 << leftShif;
+    if(lenDvsor > 2)                                                            // If the divisor has at least three digits, integrate that digit to the shifting
+        _2LeadDigitsDvsor[0] |= divisor[lenDvsor-3]>>(ui32wordlen-leftShif);    // End of the virtual normalization process for the divisor
 
+    result[1] = *this;                                                          // Initializing remainder with the value of the dividend
+    aux1 = result[1][lenDvsor - 1] >> (ui32wordlen - leftShif);
+    newLeadDigit = aux1 > 0;                                                    // Testing if the normalization process creates a new digit in the dividend
+    for(; lenDiff != ui32MAX; lenDiff--) {                                        // We are using unsigned int, so lenDiff != ui32MAX is equivalent to lenDiff != -1
+        if(newLeadDigit) {                                                      // Virtual normalization introduced a new digit
+            _3LeadDigitsDvdend[2]  = aux1;                                      // Obtaining the first three digits of a (virtually) normalized dividend
+            _3LeadDigitsDvdend[1]  = result[1][lenDvsor - 1] << leftShif;       // ...
+            aux1 = result[1][lenDvsor - 2];                                     // ...
+            _3LeadDigitsDvdend[1] |= aux1 >> (ui32wordlen - leftShif);          // ...
+            _3LeadDigitsDvdend[0] = aux1 << leftShif;                           // ...
+            _3LeadDigitsDvdend[0] |=                                            // ...
+                result[1][lenDvsor - 3] >> (ui32wordlen - leftShif);            // ...
+            newLeadDigit = false;                                               // This will prevent the entrance to this 'if' in any future cycle
+            lenDiff++;                                                           // Adding the new digit to the difference
+        } else {                                                                // We didn't have a new digit or the new digit was added in a past cycle
+            _3LeadDigitsDvdend[2] = result[1][lenDvsor+lenDiff-1] << leftShif;   // Obtaining the virtual normalized three digits from the leading four digits of
+            aux1 = result[1][lenDvsor + lenDiff - 2];                            // the dividend (accordingly to the respective cycle.)
+            _3LeadDigitsDvdend[2] |= aux1 >> (ui32wordlen - leftShif);          // ...
+            _3LeadDigitsDvdend[1] = aux1 << leftShif;                           // ...
+            aux1 = result[1][lenDvsor + lenDiff - 3];                            // ...
+            _3LeadDigitsDvdend[1] |= aux1 >> (ui32wordlen - leftShif);          // ...
+            _3LeadDigitsDvdend[0] = aux1 << leftShif;                           // ...
+            if(lenDvdend > 3) {                                                 // Guarding against a number with just three precision places
+                _3LeadDigitsDvdend[0] |=
+                result[1][lenDvsor+lenDiff-4] >> (ui32wordlen - leftShif);
+            }
+        }
+        qCap.uint[1] = _3LeadDigitsDvdend[2];                                   // This two lines are equivalent to
+        qCap.uint[0] = _3LeadDigitsDvdend[1];                                   // qCap = _3LeadDigitsDvdend[2]*2^32 + _3LeadDigitsDvdend[1]
+        rCap = qCap.ui64int %_2LeadDigitsDvsor[1];
+        aux0.uint[1] = (ui32)rCap; aux0.uint[0] = _3LeadDigitsDvdend[0];        // Equivalent to aux0 = rCap * 2^32 + _3LeadDigitsDvdend[0]
+        qCap.ui64int /= _2LeadDigitsDvsor[1];
+        aux2 = qCap.ui64int*_2LeadDigitsDvsor[0];
+        while(qCap.ui64int >= _2power32 || aux2 > aux0.ui64int) {               // Condition to eliminate most of the cases where qCap is one too big and all cases
+            --qCap.ui64int; rCap += _2LeadDigitsDvsor[1];                       // where qCap is two too big
+            if(rCap >= _2power32) break;
+            aux0.uint[1] = (ui32)rCap; aux0.uint[0] = _3LeadDigitsDvdend[0];    // Equivalent to aux0 = rCap * 2^32 + _3LeadDigitsDvdend[0]
+            aux2 = qCap.ui64int*_2LeadDigitsDvsor[0];
+        }
     }
 }
 
@@ -816,7 +858,7 @@ BigInteger& BigInteger::operator += (int v) {
     return *this;
 }
 
-ui32 BigInteger::len() {
+ui32 BigInteger::len() const {
     ui32 l;                                                                     // Will hold the length
     Digit* dt;                                                                  // Digits of this
     for(l = 0, dt = this->first; dt != NULL; dt = dt->next) {l++;}               // Computing length

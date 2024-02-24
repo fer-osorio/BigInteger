@@ -31,6 +31,7 @@ union ui32Toui16 {																// Intended to cast from 32-bits unsigned inte
 };
 
 static const ui32 _2power31   = 0x80000000;										// Equals to 2^31 = 2^32/2 (half of the base). Intended for division algorithm
+static const ui64 _2power32   = 0x100000000;									// Equals to 2^32, witch is the base we're using
 static const ui32 ui32MAX     = 0xFFFFFFFF;										// 32 bits, all 1's.
 static const ui32 ui32wordlen = 32;
 static const ui64 ui64MAX     = 0xFFFFFFFFFFFFFFFF;								// 64 bits, all 1's.
@@ -120,7 +121,7 @@ struct BigInteger {
 		}																		// At this point this->last == NULL
 		this->last = NULL;														// Before this line, this->last pointed to a freed memory location
 	}
-	ui32 len();																	// Returns length of list of digits
+	ui32 len() const ;																	// Returns length of list of digits
 	void setAsZero();															// Calls the destructor and sets this BigInteger to zero
 	void setAsOne();															// Calls the destructor and sets this BigInteger to one
 	void setAs(int x);															// Calls the destructor and sets this BigInteger to x
