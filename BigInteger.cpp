@@ -625,6 +625,7 @@ result[2]) const {
     bool newLeadDigit;                                                          // Flags the introduction of a new digit caused by the normalization process
     ui32 aux1 = 0;                                                              // Auxiliary variable. Will help in small optimizations.
     ui64 aux2 = 0;                                                              // Auxiliary variable. Will help in small optimizations.
+    Digit *dvsorDigits = NULL, *remDigits = NULL;                              // Dividend digits, remainder digits
 
     if(lenDvdend == 2) {
         qCap.uint[0] = this->first->value;                                       // Converting from two unsigned int to one unsigned int of 64 bits in each case
@@ -685,6 +686,10 @@ result[2]) const {
             if(rCap >= _2power32) break;
             aux0.uint[1] = (ui32)rCap; aux0.uint[0] = _3LeadDigitsDvdend[0];    // Equivalent to aux0 = rCap * 2^32 + _3LeadDigitsDvdend[0]
             aux2 = qCap.ui64int*_2LeadDigitsDvsor[0];
+        }
+        remDigits = result[1].getDigitptr(lenDiff);
+        for(dvsorDigits = divisor.first; dvsorDigits != NULL;
+            dvsorDigits = dvsorDigits->next) {
         }
     }
 }
