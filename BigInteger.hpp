@@ -225,6 +225,12 @@ struct BigInteger {
 		return true;
 	}
 
+	inline Digit* getDigitptr(unsigned n) const{								// Returns the ui32 in the list place n mod l where l is the length of the list
+		Digit *dt;																// This digits. Supposing we don't have a null digits list
+    	for(dt=this->first;n>0;n--,dt=dt->next) if(dt==NULL) dt = this->first;	// If we're at the end, return to the beginning
+    	return dt;
+	}
+
 	void addNonnegative(const BigInteger& x, BigInteger& result) const;			// -Computes the addition of 'this' with x and saves the result in 'result'.
 																				//  The addition is conducted as if the arguments were non negatives.
 
