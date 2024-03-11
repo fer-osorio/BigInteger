@@ -76,7 +76,10 @@ struct BigInteger {
 		this->first = new Digit((ui32)t);
 		this->last = this->first;
 	}
-	BigInteger(const BigInteger&);
+	inline BigInteger(const BigInteger& a) : NonNegative(a.NonNegative) {
+    	Digit* aux;
+    	for(aux=a.first; aux!=NULL; aux=aux->next) this->append(aux->value);
+	}
 	BigInteger(const char[], ui64, bool = true);								// -Initializing with an array of bytes (char's). Little endianess is used.
 
 	BigInteger(const char[], NumberBase = HEXADECIMAL);							// -Initializing from a formatted string. The characters will be interpreted
@@ -89,23 +92,68 @@ struct BigInteger {
 
 	// Assignment
 	BigInteger& operator = (const BigInteger&);
-	BigInteger& operator = (int);
+	BigInteger& operator = (int t) {
+    	this->clean();                                                              // Releasing memory
+    	if(t >= 0) this->NonNegative =  true;                                       // Determining sign
+    	else {
+    	    this->NonNegative = false;                                              // Saving negative sign and making 't' positive
+    	    t = -t;
+    	}
+    	this->last = this->first = new Digit((ui32)t);                               // Digit list with a unique element
+    	return *this;
+	}
 
 	// Arithmetic
 	friend BigInteger operator + (const BigInteger&, const BigInteger&);
 	friend BigInteger operator - (const BigInteger&, const BigInteger&);
 	friend BigInteger operator * (const BigInteger&, const BigInteger&);
-	BigInteger 	operator - () const;
+	inline BigInteger 	operator - () const{
+    	BigInteger r = *this;
+    	if(r != 0) r.NonNegative = !this->NonNegative;							// Guarding against a zero with negative sign
+    	else       r.NonNegative = true;
+    	return r;
+	}
 	BigInteger& operator ++ ();
-	BigInteger& operator -- ();
-	BigInteger& operator += (int);
+	inline BigInteger& operator -- () {
+    	this->NonNegative = !this->NonNegative;									// Using x-1 = -(-x + 1)
+    	this->operator++();
+    	if(this->operator==(0)) this->NonNegative = !this->NonNegative;			// If it's zero it already has the correct sign (non negative)
+    	return *this;
+	}
+	BigInteger& operator += (int v) {
+    	if(v >= 0) {
+    	    if(this->NonNegative == true)this->plusEqualNonNegative((ui32)v);
+    	    else this->minusEqualNonNegative((ui32) v);							// Using the fact -a + v == -(a - v)
+    	} else {
+    	    v = -v;
+    	    if(this->NonNegative == true)this->minusEqualNonNegative((ui32)v);
+    	    else this->plusEqualNonNegative((ui32)v);							// Using the fact -a - v == -(a + v)
+    	}
+    	return *this;
+	}
 
 	// Comparison
-	bool operator == (int) const;
-	bool operator != (int) const;
-	bool operator < (const BigInteger&) const;
+	inline bool operator == (int x) const{
+    	if(this->first == NULL) return false;                                       // No comparison at all.
+    	if(this->first->next != NULL) return false;                                 // At this point, this is necessarily bigger than x
+    	bool nonNegative = x >= 0;                                                  // Saving the sign of x
+    	if(x < 0) x = -x;                                                           // Saving absolute value of x
+    	if(x == 0 && this->first->value == 0) return true;                          // Special case; zero can have any of the signs.
+    	return nonNegative == this->NonNegative && this->first->value == (ui32)x;
+	}
+	inline bool operator != (int x) const{
+    	return !(*this == x);
+	}
+	inline bool operator < (const BigInteger& x) const {
+    	if(this->compare(x) == -1) return true;
+    	else return false;
+	}
 
-	ui32 operator [] (ui32 n) const;											// Returns the ui32 in the list place |n| mod l where l is the length of the list
+	inline ui32 operator [] (ui32 n) const {									// Returns the ui32 in the list place n mod l where l is the length of the list
+    	Digit *dt;																// This digits. Supposing we don't have a null digits list
+    	for(dt=this->first;n>0;n--,dt=dt->next) if(dt==NULL) dt = this->first;	// If we're at the end, return to the beginning
+    	return dt->value;
+	};
 
 	friend std::ostream& operator << (std::ostream&, BigInteger);
 
@@ -121,15 +169,50 @@ struct BigInteger {
 		}																		// At this point this->last == NULL
 		this->last = NULL;														// Before this line, this->last pointed to a freed memory location
 	}
-	ui32 len() const ;																	// Returns length of list of digits
-	void setAsZero();															// Calls the destructor and sets this BigInteger to zero
-	void setAsOne();															// Calls the destructor and sets this BigInteger to one
-	void setAs(int x);															// Calls the destructor and sets this BigInteger to x
-	void append(ui32);															// In the list of digits, puts a new element at the end
-	void push(ui32);															// In the list of digits, puts a new element at the beginning
-	ui32 pop(void);																// In the list of digits, returns the value of the last element and deletes it
+	ui32 len() const{															// Returns the amount of elements in the list of digits
+    	ui32 l;																	// Will hold the length
+    	Digit* dt;																// Digits of this
+    	for(l = 0, dt = this->first; dt != NULL; dt = dt->next) {l++;}			// Computing length
+    	return l;
+	}
+	inline void setAs(int x) {													// Clean and sets this BigInteger to x
+    	this->clean();
+    	if(x < 0) { this->NonNegative = false; x = -x;}
+    	else this->NonNegative = true;
+    	this->first = new Digit((ui32)x);
+    	this->last = this->first;
+	}
+	inline void append(ui32 x) {												// In the list of digits, puts a new element at the end
+    	if(this->first == NULL) {
+    	    this->first = new Digit(x);
+    	    this->last = this->first;
+    	    return;
+    	}
+    	this->last->next =  new Digit(x);
+    	this->last = this->last->next;
+	}
+	inline ui32 pop() {
+    	if(this->first == NULL) return 0;										// NULL list, this should be handle by an exception.
+    	ui64 r = this->last->value;												// Saving last value
+    	if(this->first->next == NULL) {											// Single precision number
+    	    if(r != this->first->value){/*Some exception here*/}
+    	    return r;															// Don't deleting unique list element in order to prevent an empty list
+    	}
+    	Digit* aux;
+    	for(aux = this->first; aux->next->next != NULL; aux = aux->next) {}		// Reaching the element before the last Digit object
+    	delete this->last;														// Updating last attribute
+    	this->last = aux;
+    	this->last->next = NULL;
+    	return r;
+	}
+	inline void push(ui32 x) {													// New element at the beginning of the Digits list
+    	Digit* _first = new Digit(x);
+    	if(this->last == NULL) this->last = _first;                             // Guarding against BigInteger initialized with NULL pointer.)
+    	_first->next = this->first;
+    	this->first = _first;
+	}
 	bool isValidDigit(char, NumberBase);										// Given a number base...
-	void plusEqualNonNegative(ui32 x);												// Adds x to this BigInteger. Assuming this BigInteger is non negative.
+	void plusEqualNonNegative(ui32 x);											// Adds x to this BigInteger. Assuming this BigInteger is non negative.
 	void minusEqualNonNegative(ui32 x);											// Subtracts x from this BigInteger. Assuming this BigInteger is non negative.
 	int  compare(const BigInteger& x) const;									// Compares two BigIntegers. Returns -1 for this < x, 0 for this == x and 1 for
 																				// this > x
